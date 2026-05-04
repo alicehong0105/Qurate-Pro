@@ -34,7 +34,7 @@ def load_data():
         return resp.json()
     except: return []
 
-# --- 5. 主要功能導航 ---
+# --- 5. 主要導航 ---
 choice = st.sidebar.radio("功能選單", ["📋 管理矩陣", "🎯 訓練模式", "📅 遺忘排程"])
 
 if choice == "📋 管理矩陣":
@@ -50,8 +50,16 @@ if choice == "📋 管理矩陣":
             c1, c2 = st.columns(2)
             f_word = c1.text_input("英文單字*")
             f_mean = c2.text_input("中文翻譯*")
-            f_pos = st.multiselect("詞性", ["n.", "v.", "adj.", "adv.", "phr.", "Term."])
-            f_forms = st.text_input("三態/變化 (other_forms)")
+            f_pos = st.multiselect("詞性", ["n.", "v.", "adj.", "adv.", "phr.", "prep.", "conj."])
+            
+            c3, c4 = st.columns(2)
+            f_forms = c3.text_input("三態/變化 (other_forms)")
+            f_cat = c4.text_input("類別", value="未分類")
+            
+            c5, c6 = st.columns(2)
+            f_coll = c5.text_input("慣用搭配 (collocations)")
+            f_syn = c6.text_input("同義詞 (synonyms)")
+            
             f_en_def = st.text_area("英文定義 (meaning_en)")
             f_ex = st.text_area("例句 (example)")
             
@@ -63,35 +71,56 @@ if choice == "📋 管理矩陣":
                         st.rerun()
                     else:
                         payload = {
-                            "word": f_word.strip(), "meaning_zh": f_mean.strip(), "pos": ", ".join(f_pos) if f_pos else None,
-                            "other_forms": f_forms if f_forms else None, "meaning_en": f_en_def if f_en_def else None,
-                            "example": f_ex if f_ex else None, "mastery": 1, "next_review": get_next_review_date(1)
+                            "word": f_word.strip(), "meaning_zh": f_mean.strip(), 
+                            "pos": ", ".join(f_pos) if f_pos else None,
+                            "category": f_cat, "other_forms": f_forms, 
+                            "collocations": f_coll, "synonyms": f_syn,
+                            "meaning_en": f_en_def, "example": f_ex, 
+                            "mastery": 1, "next_review": get_next_review_date(1)
                         }
-                        payload = {k: v for k, v in payload.items() if v is not None}
-                        httpx.post(f"{URL}/rest/v1/vocabulary", json=payload, headers=HEADERS)
+                        # 過濾掉空值，避免資料庫報錯
+                        clean_payload = {k: v for k, v in payload.items() if v}
+                        httpx.post(f"{URL}/rest/v1/vocabulary", json=clean_payload, headers=HEADERS)
                         st.rerun()
 
     with tab_edit:
         if not df.empty:
-            target_word = st.selectbox("🎯 選擇要操作的單字", options=df['word'].tolist())
+            target_word = st.selectbox("🎯 選擇要修改的單字", options=df['word'].tolist())
             row = df[df['word'] == target_word].iloc[0]
+            
             with st.form("edit_form"):
+                # 編輯模式的介面現在與新增模式完全一樣
                 ec1, ec2 = st.columns(2)
-                u_word = ec1.text_input("單字", value=row['word'])
-                u_mean = ec2.text_input("中文翻譯", value=row['meaning_zh'])
-                u_pos = st.text_input("詞性 (字串格式)", value=row.get('pos', ''))
-                u_ex = st.text_area("例句", value=row.get('example', ''))
+                u_word = ec1.text_input("英文單字", value=row.get('word',''))
+                u_mean = ec2.text_input("中文翻譯", value=row.get('meaning_zh',''))
+                u_pos = st.text_input("詞性 (字串格式)", value=row.get('pos',''))
+                
+                ec3, ec4 = st.columns(2)
+                u_forms = ec3.text_input("三態/變化", value=row.get('other_forms',''))
+                u_cat = ec4.text_input("類別", value=row.get('category',''))
+                
+                ec5, ec6 = st.columns(2)
+                u_coll = ec5.text_input("慣用搭配", value=row.get('collocations',''))
+                u_syn = ec6.text_input("同義詞", value=row.get('synonyms',''))
+                
+                u_en_def = st.text_area("英文定義", value=row.get('meaning_en',''))
+                u_ex = st.text_area("例句", value=row.get('example',''))
                 
                 btn_save, btn_del, _ = st.columns([1, 1, 4])
                 if btn_save.form_submit_button("💾 儲存修改"):
-                    upd = {"word": u_word, "meaning_zh": u_mean, "pos": u_pos, "example": u_ex}
+                    upd = {
+                        "word": u_word, "meaning_zh": u_mean, "pos": u_pos, 
+                        "category": u_cat, "other_forms": u_forms, 
+                        "collocations": u_coll, "synonyms": u_syn,
+                        "meaning_en": u_en_def, "example": u_ex
+                    }
                     httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{row['id']}", json=upd, headers=HEADERS)
                     st.rerun()
                 if btn_del.form_submit_button("🗑️ 刪除單字"):
                     httpx.delete(f"{URL}/rest/v1/vocabulary?id=eq.{row['id']}", headers=HEADERS)
                     st.rerun()
 
-    # --- B. 重複挑戰 ---
+    # --- B. 重複偵測與挑戰 ---
     if st.session_state.duplicate_word:
         st.warning(f"⚠️ 「{st.session_state.duplicate_word}」已存在！")
         if st.button("⚔️ 挑戰突擊測驗"):
@@ -103,13 +132,13 @@ if choice == "📋 管理矩陣":
         target = next((w for w in raw_data if w['word'].lower() == st.session_state.force_quiz_word.lower()), None)
         if target:
             ans = st.text_input(f"請拼寫出「{target['meaning_zh']}」的英文：")
-            if st.button("確認"):
+            if st.button("確認提交"):
                 if ans.strip().lower() == target['word'].lower():
                     st.session_state.show_balloons = True
                     st.session_state.force_quiz_word = False
                     st.rerun()
 
-    # --- C. 搜尋與分區顯示 ---
+    # --- C. 搜尋、下載與分區顯示 ---
     if not df.empty:
         st.divider()
         search_q = st.text_input("🔍 搜尋關鍵字")
@@ -119,11 +148,11 @@ if choice == "📋 管理矩陣":
         c_left, c_right = st.columns([3, 1])
         v_mode = c_left.radio("顯示模式", ["分區檢視", "完整名單"], horizontal=True)
         csv = df.to_csv(index=False).encode('utf-8-sig')
-        c_right.download_button("📥 下載 CSV", csv, "lexi_export.csv")
+        c_right.download_button("📥 下載 CSV 備份", csv, f"lexi_{date.today()}.csv")
 
-        show_cols = ['word', 'meaning_zh', 'pos', 'mastery']
+        show_cols = ['word', 'meaning_zh', 'pos', 'category', 'mastery']
         if v_mode == "分區檢視":
-            t1, t2, t3 = st.tabs(["🌱 L0-1", "🏃 L2-3", "👑 L4-5"])
+            t1, t2, t3 = st.tabs(["🌱 L0-1 (新單字)", "🏃 L2-3 (複習中)", "👑 L4-5 (已精通)"])
             t1.dataframe(df[df['mastery'] <= 1][show_cols], use_container_width=True)
             t2.dataframe(df[(df['mastery'] >= 2) & (df['mastery'] <= 3)][show_cols], use_container_width=True)
             t3.dataframe(df[df['mastery'] >= 4][show_cols], use_container_width=True)
@@ -131,7 +160,7 @@ if choice == "📋 管理矩陣":
             st.dataframe(df[show_cols], use_container_width=True)
 
 elif choice == "🎯 訓練模式":
-    st.title("🎯 訓練模式")
+    st.title("🎯 深度複習訓練")
     raw_data = load_data()
     today = str(date.today())
     
@@ -145,7 +174,7 @@ elif choice == "🎯 訓練模式":
             if q.get('meaning_en'): opts.append("英文定義")
             st.session_state.quiz_state['q_type'] = random.choice(opts)
         else:
-            st.success("🎉 今日複習完成！")
+            st.success("🎉 矩陣所有單字目前都已記牢，今日複習完成！")
             st.stop()
 
     target = next((w for w in raw_data if w['word'] == st.session_state.quiz_state['word']), None)
@@ -158,19 +187,21 @@ elif choice == "🎯 訓練模式":
         else:
             st.info(f"💡 中文：{target['meaning_zh']}")
 
-        ans = st.text_input("拼寫：")
-        if st.button("送出"):
+        ans = st.text_input("輸入拼寫：")
+        if st.button("提交"):
             if ans.strip().lower() == target['word'].lower():
                 st.session_state.show_balloons = True
                 new_m = min(5, target.get('mastery', 1) + 1)
-                httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{target['id']}", json={"mastery": new_m, "next_review": get_next_review_date(new_m)}, headers=HEADERS)
+                httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{target['id']}", 
+                            json={"mastery": new_m, "next_review": get_next_review_date(new_m)}, headers=HEADERS)
                 st.session_state.quiz_state['word'] = None
                 st.rerun()
-            else: st.error("不對喔！")
+            else: st.error("不對喔，再想一下！")
 
 elif choice == "📅 遺忘排程":
-    st.title("📅 遺忘排程")
+    st.title("📅 遺忘曲線排程")
     raw_data = load_data()
     if raw_data:
         df = pd.DataFrame(raw_data)
-        st.dataframe(df[['word', 'meaning_zh', 'mastery', 'next_review']], use_container_width=True)
+        df['nr_date'] = pd.to_datetime(df['next_review']).dt.date
+        st.dataframe(df[['word', 'meaning_zh', 'mastery', 'nr_date']].sort_values('nr_date'), use_container_width=True)
