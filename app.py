@@ -150,10 +150,99 @@ if choice == "📋 管理矩陣":
     if all_data:
         st.dataframe(pd.DataFrame(all_data), use_container_width=True)
 
-elif choice == "🎯 訓練模式":
-    st.title("🎯 單字訓練模式")
-    st.write("這裡是純淨的測驗空間，不會出現新增欄位。")
-    # 這裡可以接你其他的隨機測驗代碼
+elif choice == "📋 管理矩陣":
+    st.title("📋 矩陣資料庫管理")
+    
+    # 讀取雲端資料
+    raw_data = load_data() # 這會從 Supabase 抓資料
+    
+    if raw_data:
+        # --- 1. 選擇要管理的單字 ---
+        search_list = [w.get('word', '未知') for w in raw_data]
+        search_word = st.selectbox("🔍 選擇要預覽或編輯的單字：", search_list)
+        
+        # 找到選中的單字詳細資料
+        target_w = next((w for w in raw_data if w.get('word') == search_word), None)
+        
+        if target_w:
+            with st.container(border=True):
+                # --- 2. 模式切換：預覽 vs 編輯 ---
+                edit_mode = st.toggle("✏️ 開啟修改模式")
+                
+                if edit_mode:
+                    st.subheader(f"🛠️ 正在編輯：{target_w['word']}")
+                    with st.form("edit_existing_form"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            new_word = st.text_input("單字名稱", value=target_w.get('word', ''))
+                            # 處理詞性 (Supabase 存的是字串，轉回清單給 multiselect)
+                            old_pos = target_w.get('pos', '')
+                            default_pos = [p.strip() for p in old_pos.split(',')] if old_pos else []
+                            new_pos_list = st.multiselect(
+                                "詞性", 
+                                ["n.", "v.", "adj.", "adv.", "phr.", "Term."],
+                                default=[p for p in default_pos if p in ["n.", "v.", "adj.", "adv.", "phr.", "Term."]]
+                            )
+                            new_cat = st.text_input("類別", value=target_w.get('category', '未分類'))
+                            new_mas = st.number_input("掌握等級 (0~5)", 0, 5, value=int(target_w.get('mastery', 0)))
+
+                        with col2:
+                            new_mean = st.text_input("中文解釋", value=target_w.get('meaning_zh', ''))
+                            new_syn = st.text_input("同義詞", value=target_w.get('synonyms', ''))
+                            # 補齊你提到的欄位：三態變化與搭配
+                            new_forms = st.text_input("三態/變化", value=target_w.get('other_forms', ''))
+                            new_coll = st.text_input("慣用搭配", value=target_w.get('collocations', ''))
+                        
+                        # --- 補齊缺失的長文字區 ---
+                        new_def = st.text_area("英文定義 (meaning_en)", value=target_w.get('meaning_en', ''), height=100)
+                        new_ex = st.text_area("例句 (example)", value=target_w.get('example', ''), height=100)
+                        
+                        if st.form_submit_button("💾 儲存修改至雲端"):
+                            # 準備更新的資料
+                            update_payload = {
+                                "word": new_word,
+                                "pos": ", ".join(new_pos_list),
+                                "meaning_zh": new_mean,
+                                "meaning_en": new_def,
+                                "example": new_ex,
+                                "category": new_cat,
+                                "synonyms": new_syn,
+                                "mastery": new_mas,
+                                "next_review": get_next_review_date(new_mas)
+                            }
+                            # 呼叫 Supabase 更新 (需對應 id)
+                            api_url = f"{URL}/rest/v1/vocabulary?id=eq.{target_w['id']}"
+                            response = httpx.patch(api_url, json=update_payload, headers=HEADERS)
+                            
+                            if response.status_code < 400:
+                                st.success(f"✅ '{new_word}' 已成功同步至雲端資料庫！")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ 更新失敗：{response.text}")
+                
+                else:
+                    # --- 3. 預覽模式 (單字卡) ---
+                    st.markdown(f"### 🔤 {target_w['word']} (`{target_w.get('pos', '無')}`)")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.write(f"**📌 類別：** {target_w.get('category', '未分類')}")
+                        st.write(f"**💡 中文：** {target_w.get('meaning_zh', '未填寫')}")
+                        st.write(f"**🔄 變化：** {target_w.get('other_forms', '無')}")
+                    with c2:
+                        st.write(f"**⭐ 等級：** L{target_w.get('mastery', 0)}")
+                        st.write(f"**🔗 搭配：** {target_w.get('collocations', '無')}")
+                        st.write(f"**👯 同義：** {target_w.get('synonyms', '無')}")
+                        
+                    st.info(f"**📖 英文定義：**\n{target_w.get('meaning_en') or '未填寫'}")
+                    st.warning(f"**📝 例句：**\n{target_w.get('example') or '未填寫'}")
+
+    # --- 4. 底部顯示原始表格 (方便快速瀏覽) ---
+    st.divider()
+    st.subheader("📊 雲端矩陣概覽")
+    if raw_data:
+        st.dataframe(pd.DataFrame(raw_data), use_container_width=True)
 
 elif choice == "📅 遺忘排程":
     st.title("📅 遺忘排程")
