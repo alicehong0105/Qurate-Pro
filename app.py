@@ -46,7 +46,9 @@ due_count = len(df[pd.to_datetime(df['next_review']).dt.date <= date.today()]) i
 st.sidebar.markdown("<h2 style='color: #2d3436;'>⚡ Qurate Pro</h2>", unsafe_allow_html=True)
 pulse_label = f"🎯 Flash Pulse {'🔴' if due_count > 0 else ''}"
 choice = st.sidebar.radio("SYSTEM ACCESS", ["📋 Matrix Core", pulse_label, "📅 Ebbing Log"])
-
+if st.sidebar.button("🔄 Force Sync Matrix"):
+    st.cache_data.clear() # 如果你有用 @st.cache_data 的話
+    st.rerun()
 # --- 5. 核心模組 ---
 
 if "Matrix Core" in choice:
