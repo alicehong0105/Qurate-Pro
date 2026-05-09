@@ -4,36 +4,44 @@ import pandas as pd
 from datetime import date, timedelta
 import random
 
-# --- 1. 頁面配置與高級感介面 ---
+# --- 1. 頁面配置與極簡視覺風格 ---
 st.set_page_config(page_title="Qurate Pro", page_icon="⚡", layout="wide")
 
 st.markdown("""
     <style>
-        [data-testid="stHeader"] { visibility: hidden; }
+        /* 消除上方空白 */
+        [data-testid="stHeader"] { visibility: hidden; height: 0rem; }
+        .block-container { padding-top: 1.5rem !important; padding-bottom: 0rem !important; }
         footer { visibility: hidden; }
+        
+        /* 標題與字體：深碳黑風格 */
         .main-title {
-            background: linear-gradient(90deg, #007bff, #00d4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 800; font-size: 2.2rem; margin-bottom: 0.5rem;
+            color: #2d3436; 
+            font-weight: 800; font-size: 2.2rem; 
+            margin-bottom: 0.5rem; letter-spacing: -1px;
         }
+        
+        /* 按鈕：質感深色 */
         .stButton > button {
             width: 100%; border-radius: 12px; height: 3.5rem;
-            background: linear-gradient(135deg, #6e8efb, #a777e3);
-            color: white; font-weight: bold; border: none;
+            background: #2d3436; color: white; font-weight: bold; border: none;
         }
+        
+        /* 輸入框手機適配 */
         input { font-size: 16px !important; }
-        .mobile-hint { color: #888; font-size: 0.8rem; margin-bottom: 1rem; }
+        @media (max-width: 768px) {
+            .main-title { font-size: 1.8rem; }
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. 核心功能與演算法 ---
+# --- 2. 核心 API 與 艾賓浩斯演算法 ---
 URL = st.secrets["connections"]["supabase"]["url"]
 KEY = st.secrets["connections"]["supabase"]["key"]
 HEADERS = {"apikey": KEY, "Authorization": f"Bearer {KEY}", "Content-Type": "application/json"}
 
 def get_next_review_date(mastery):
-    # 艾賓浩斯間隔：1, 3, 7, 14, 30天
+    # 艾賓浩斯週期：1, 3, 7, 14, 30 天
     curve = {0: 0, 1: 1, 2: 3, 3: 7, 4: 14, 5: 30}
     return str(date.today() + timedelta(days=curve.get(mastery, 1)))
 
@@ -48,10 +56,9 @@ for key in ['quiz_state', 'duplicate_word', 'force_quiz_word']:
     if key not in st.session_state:
         st.session_state[key] = {'word': None} if key == 'quiz_state' else False
 
-# --- 4. 側邊欄導航 ---
-st.sidebar.markdown("<h1 style='color: #007bff;'>⚡ Qurate Pro</h1>", unsafe_allow_html=True)
+# --- 4. 側邊導航 ---
+st.sidebar.markdown("<h2 style='color: #2d3436;'>⚡ Qurate Pro</h2>", unsafe_allow_html=True)
 choice = st.sidebar.radio("SYSTEM ACCESS", ["📋 Matrix Core", "🎯 Flash Pulse", "📅 Ebbing Log"])
-st.sidebar.caption("💡 手機端請點擊左上角 ☰ 切換功能")
 
 # --- 5. 功能模組 ---
 
@@ -62,7 +69,7 @@ if choice == "📋 Matrix Core":
 
     t_add, t_view, t_edit = st.tabs(["➕ Initialize", "🔍 View Matrix", "📝 Modify Protocol"])
 
-    # --- 增加模式 ---
+    # --- A. 新增模式 ---
     with t_add:
         with st.form("add_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
@@ -70,23 +77,23 @@ if choice == "📋 Matrix Core":
             f_mean = c2.text_input("Definition (中文)*")
             
             st.write("---")
-            st.caption("Morphology (動詞三態變化)")
+            st.caption("Morphology (V1 / V2 / V3)")
             v1, v2, v3 = st.columns(3)
-            f_v1 = v1.text_input("V1 (Base)")
-            f_v2 = v2.text_input("V2 (Past)")
-            f_v3 = v3.text_input("V3 (P.P.)")
+            f_v1 = v1.text_input("V1 (Base)", key="a_v1")
+            f_v2 = v2.text_input("V2 (Past)", key="a_v2")
+            f_v3 = v3.text_input("V3 (P.P.)", key="a_v3")
             
             st.write("---")
-            f_pos = st.multiselect("Class (詞性)", ["n.", "v.", "adj.", "adv.", "phr."])
+            f_pos = st.multiselect("Class (詞性)", ["n.", "v.", "adj.", "adv.", "phr.", "prep."])
             c3, c4 = st.columns(2)
             f_syn = c3.text_input("Synonyms (同義詞)")
             f_coll = c4.text_input("Collocations (搭配)")
-            
             f_en = st.text_area("English Definition")
             f_ex = st.text_area("Context Sentence")
             
             if st.form_submit_button("🚀 SYNC TO CORE"):
                 if f_word.strip() and f_mean.strip():
+                    # 檢查重複
                     dup = next((w for w in raw_data if w['word'].lower() == f_word.strip().lower()), None)
                     if dup:
                         st.session_state.duplicate_word = f_word.strip()
@@ -101,40 +108,39 @@ if choice == "📋 Matrix Core":
                         httpx.post(f"{URL}/rest/v1/vocabulary", json={k:v for k,v in payload.items() if v}, headers=HEADERS)
                         st.balloons(); st.rerun()
 
-    # --- 檢視模式 ---
+    # --- B. 分區檢視 ---
     with t_view:
         if not df.empty:
-            v_f = st.radio("Display Protocol", ["Due Today", "All Nodes", "Mastered (L5)"], horizontal=True)
-            search = st.text_input("🔍 Search Matrix...")
+            v_filter = st.radio("Display Filter", ["Due Today", "All Nodes", "Mastered (L5)"], horizontal=True)
+            search = st.text_input("🔍 Neural Search...")
             d_df = df.copy()
-            if v_f == "Due Today": d_df = d_df[pd.to_datetime(d_df['next_review']).dt.date <= date.today()]
-            elif v_f == "Mastered (L5)": d_df = d_df[d_df['mastery'] >= 5]
-            if search: d_df = d_df[d_df['word'].str.contains(search, case=False)]
+            if v_filter == "Due Today": d_df = d_df[pd.to_datetime(d_df['next_review']).dt.date <= date.today()]
+            elif v_filter == "Mastered (L5)": d_df = d_df[d_df['mastery'] >= 5]
+            if search: d_df = d_df[d_df['word'].str.contains(search, case=False) | d_df['meaning_zh'].str.contains(search)]
             st.dataframe(d_df[['word', 'meaning_zh', 'other_forms', 'mastery', 'next_review']], use_container_width=True)
 
-    # --- 編輯模式 (補齊所有欄位) ---
+    # --- C. 完整修改模式 (All Fields) ---
     with t_edit:
         if not df.empty:
-            target = st.selectbox("Select Node to Modify", options=df['word'].tolist())
+            target = st.selectbox("Select Word to Modify", options=df['word'].tolist())
             row = df[df['word'] == target].iloc[0]
             
-            # 解析原本的三態
-            v_list = row.get('other_forms', '').split(' / ') if row.get('other_forms') else ["", "", ""]
-            while len(v_list) < 3: v_list.append("")
-
-            # 劍橋發音
-            st.link_button(f"🔊 Cambridge Pronunciation: {target}", f"https://dictionary.cambridge.org/dictionary/english-chinese-traditional/{target.replace(' ', '-')}")
+            # 解析三態反填
+            v_parts = row.get('other_forms', '').split(' / ') if row.get('other_forms') else ["", "", ""]
+            while len(v_parts) < 3: v_parts.append("")
             
-            with st.form("edit_protocol_form"):
+            st.link_button(f"🔊 Audio: {target} (Cambridge)", f"https://dictionary.cambridge.org/dictionary/english-chinese-traditional/{target.replace(' ', '-')}")
+            
+            with st.form("full_edit_form"):
                 e1, e2 = st.columns(2)
                 u_word = e1.text_input("Entry", value=row.get('word',''))
                 u_mean = e2.text_input("Definition (中文)", value=row.get('meaning_zh',''))
                 
                 st.caption("Morphology (V1 / V2 / V3)")
                 ev1, ev2, ev3 = st.columns(3)
-                u_v1 = ev1.text_input("V1", value=v_list[0])
-                u_v2 = ev2.text_input("V2", value=v_list[1])
-                u_v3 = ev3.text_input("V3", value=v_list[2])
+                u_v1 = ev1.text_input("V1", value=v_parts[0])
+                u_v2 = ev2.text_input("V2", value=v_parts[1])
+                u_v3 = ev3.text_input("V3", value=v_parts[2])
                 
                 st.write("---")
                 e3, e4 = st.columns(2)
@@ -144,7 +150,7 @@ if choice == "📋 Matrix Core":
                 u_en = st.text_area("English Definition", value=row.get('meaning_en',''))
                 u_ex = st.text_area("Context Sentence", value=row.get('example',''))
                 
-                if st.form_submit_button("✅ UPDATE MATRIX NODE"):
+                if st.form_submit_button("✅ UPDATE PROTOCOL"):
                     new_variants = f"{u_v1} / {u_v2} / {u_v3}" if u_v1 else ""
                     upd_payload = {
                         "word": u_word, "meaning_zh": u_mean, "other_forms": new_variants,
@@ -152,19 +158,19 @@ if choice == "📋 Matrix Core":
                         "meaning_en": u_en, "example": u_ex
                     }
                     httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{row['id']}", json=upd_payload, headers=HEADERS)
-                    st.success("Protocol Updated."); st.rerun()
+                    st.success("Changes saved."); st.rerun()
 
-    # 重複挑戰
+    # 重複挑戰邏輯
     if st.session_state.duplicate_word:
         st.error(f"Duplicate Node: '{st.session_state.duplicate_word}' already exists.")
-        if st.button("⚔️ Start Force Challenge"):
+        if st.button("⚔️ Force Challenge"):
             st.session_state.force_quiz_word = st.session_state.duplicate_word
             st.session_state.duplicate_word = False; st.rerun()
     if st.session_state.force_quiz_word:
         q_ans = st.text_input(f"Verify Entry '{st.session_state.force_quiz_word}':")
         if st.button("VERIFY"):
             if q_ans.lower() == st.session_state.force_quiz_word.lower():
-                st.success("Verification Success."); st.session_state.force_quiz_word = False; st.rerun()
+                st.success("Verified."); st.session_state.force_quiz_word = False; st.rerun()
 
 elif choice == "🎯 Flash Pulse":
     st.markdown("<div class='main-title'>Flash Pulse</div>", unsafe_allow_html=True)
@@ -180,8 +186,8 @@ elif choice == "🎯 Flash Pulse":
                 new_m = min(5, q['mastery'] + 1)
                 httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{q['id']}", json={"mastery": new_m, "next_review": get_next_review_date(new_m)}, headers=HEADERS)
                 st.rerun()
-            else: st.error("Inconsistent Node.")
-    else: st.success("Matrix Stable.")
+            else: st.error("Incorrect. Try again.")
+    else: st.success("Matrix Stable. No pending tasks.")
 
 elif choice == "📅 Ebbing Log":
     st.markdown("<div class='main-title'>Ebbing Log</div>", unsafe_allow_html=True)
@@ -189,11 +195,13 @@ elif choice == "📅 Ebbing Log":
     if raw_data:
         df = pd.DataFrame(raw_data)
         df['date'] = pd.to_datetime(df['next_review']).dt.date
+        
+        # 線型預測圖表 (不要面積)
         st.subheader("📈 Retention Forecast (Line)")
         f_dates = [date.today() + timedelta(days=i) for i in range(8)]
         f_counts = [len(df[df['date'] <= d]) for d in f_dates]
-        chart_data = pd.DataFrame({"Date": f_dates, "Cumulative Load": f_counts}).set_index("Date")
-        st.line_chart(chart_data) # 純線型圖表
+        chart_data = pd.DataFrame({"Date": f_dates, "Load": f_counts}).set_index("Date")
+        st.line_chart(chart_data)
         
         c1, c2, c3 = st.columns(3)
         c1.metric("Due Today", len(df[df['date'] <= date.today()]))
