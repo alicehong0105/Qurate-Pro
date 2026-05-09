@@ -158,12 +158,27 @@ if "Matrix Core" in choice:
                 u_ex = st.text_area("Context Example", value=row.get('example', ''))
                 
                 if st.form_submit_button("✅ UPDATE MATRIX"):
+                    def empty_to_none(v):
+                        return v if v and v.strip() else None
                     upd_payload = {
                         "word": u_word, "meaning_zh": u_mean, 
-                        "pos": u_pos if u_pos else [], # 徹底杜絕 22P02 報錯
+                        "pos": u_pos if u_pos else [],
                         "next_review": u_date.strftime('%Y-%m-%d'),
-                        "other_forms": f"{u_v1} / {u_v2} / {u_v3}" if u_v1 else "",
-                        "synonyms": u_syn, "collocations": u_coll, "meaning_en": u_en, "example": u_ex
+                        "other_forms": f"{u_v1} / {u_v2} / {u_v3}" if u_v1 else None,
+                        "synonyms": empty_to_none(u_syn),
+                        "collocations": empty_to_none(u_coll),
+                        "meaning_en": empty_to_none(u_en),
+                        "example": empty_to_none(u_ex)
+                    }
+                    payload = {
+                        "word": f_word.strip(), "meaning_zh": f_mean.strip(), 
+                        "pos": f_pos if f_pos else [],
+                        "other_forms": f"{f_v1} / {f_v2} / {f_v3}" if f_v1 else None,
+                        "synonyms": f_syn if f_syn.strip() else None,  # 加這個
+                        "collocations": f_coll if f_coll.strip() else None,  # 加這個
+                        "meaning_en": f_en if f_en.strip() else None,  # 加這個
+                        "example": f_ex if f_ex.strip() else None,  # 加這個
+                        "mastery": 1, "next_review": get_ebbinghaus_date(1)
                     }
                     resp = httpx.patch(f"{URL}/rest/v1/vocabulary?id=eq.{row['id']}", json=upd_payload, headers=HEADERS)
                     if resp.status_code < 300:
