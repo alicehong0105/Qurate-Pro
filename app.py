@@ -235,83 +235,199 @@ if "Matrix Core" in choice:
 
 
 # ============================================================
-# 6. 頁面：Matrix Cards（單字翻卡預習）
+# 6. 頁面：Matrix Cards（單字翻卡預習 — 自訂正反面模式）
 # ============================================================
 elif "Matrix Cards" in choice:
     st.markdown("<div class='main-title'>Matrix Cards</div>", unsafe_allow_html=True)
 
-    due_cards = [w for w in raw_data if str(w.get('next_review'))[:10] <= str(date.today())]
+    # ── 欄位選項定義 ──────────────────────────────────────────
+    FIELD_OPTIONS = {
+        "🔤 英文單字":   "word",
+        "🇹🇼 中文定義":  "meaning_zh",
+        "📖 英文定義":   "meaning_en",
+        "📝 例句填空":   "example_blank",   # 特殊：將例句中的單字挖空
+        "📝 完整例句":   "example",
+        "💡 詞性":       "pos",
+        "📚 三態變化":   "other_forms",
+        "🔗 同義詞":     "synonyms",
+        "🎯 慣用搭配":   "collocations",
+    }
+    FIELD_LABELS = list(FIELD_OPTIONS.keys())
 
+    # ── 卡片模式設定面板 ──────────────────────────────────────
+    with st.expander("⚙️ 自訂卡片模式", expanded=("card_front_fields" not in st.session_state)):
+        st.caption("選擇今天正面要顯示什麼、反面要顯示什麼（可多選）")
+
+        cfg1, cfg2 = st.columns(2)
+        with cfg1:
+            st.markdown("**正面（提示）**")
+            front_choices = st.multiselect(
+                "正面顯示欄位",
+                FIELD_LABELS,
+                default=st.session_state.get("card_front_fields", ["🇹🇼 中文定義"]),
+                key="front_select",
+                label_visibility="collapsed"
+            )
+        with cfg2:
+            st.markdown("**反面（答案）**")
+            back_choices = st.multiselect(
+                "反面顯示欄位",
+                FIELD_LABELS,
+                default=st.session_state.get("card_back_fields", ["🔤 英文單字", "📖 英文定義", "📝 完整例句"]),
+                key="back_select",
+                label_visibility="collapsed"
+            )
+
+        col_scope, col_confirm = st.columns([2, 1])
+        with col_scope:
+            card_scope = st.radio(
+                "複習範圍",
+                ["📅 今日到期", "📦 全部單字"],
+                horizontal=True,
+                index=0 if st.session_state.get("card_scope", "due") == "due" else 1
+            )
+        with col_confirm:
+            st.write("")
+            if st.button("✅ 套用設定", use_container_width=True):
+                st.session_state.card_front_fields = front_choices
+                st.session_state.card_back_fields  = back_choices
+                st.session_state.card_scope        = "due" if "今日" in card_scope else "all"
+                st.session_state.card_index        = 0
+                st.session_state.is_flipped        = False
+                st.rerun()
+
+    # 套用預設值（第一次進入）
+    if "card_front_fields" not in st.session_state:
+        st.session_state.card_front_fields = ["🇹🇼 中文定義"]
+    if "card_back_fields" not in st.session_state:
+        st.session_state.card_back_fields  = ["🔤 英文單字", "📖 英文定義", "📝 完整例句"]
+    if "card_scope" not in st.session_state:
+        st.session_state.card_scope = "due"
+
+    # ── 篩選卡片池 ────────────────────────────────────────────
+    if st.session_state.card_scope == "due":
+        due_cards = [w for w in raw_data if str(w.get('next_review'))[:10] <= str(date.today())]
+    else:
+        due_cards = list(raw_data)
+
+    # ── 渲染欄位的輔助函式 ────────────────────────────────────
+    def render_fields(card, field_labels, is_front=False):
+        """依照選擇的欄位清單渲染卡片內容。"""
+        for label in field_labels:
+            field_key = FIELD_OPTIONS.get(label)
+            if not field_key:
+                continue
+
+            if field_key == "word":
+                st.markdown(
+                    f"<h1 style='text-align:center; font-size:3.5rem; margin:0.5rem 0;'>{card['word']}</h1>",
+                    unsafe_allow_html=True
+                )
+                st.link_button(
+                    "🔊 Cambridge Pronunciation",
+                    f"https://dictionary.cambridge.org/dictionary/english-chinese-traditional/{card['word'].replace(' ', '-')}"
+                )
+
+            elif field_key == "meaning_zh":
+                val = card.get("meaning_zh", "")
+                if val:
+                    st.markdown(
+                        f"<h3 style='text-align:center; color:#2d3436;'>{val}</h3>",
+                        unsafe_allow_html=True
+                    )
+
+            elif field_key == "meaning_en":
+                val = card.get("meaning_en", "")
+                st.markdown(f"**📖 英文定義：** {val or '—'}")
+
+            elif field_key == "example_blank":
+                ex = card.get("example", "")
+                word = card.get("word", "")
+                if ex and word:
+                    # 不分大小寫挖空
+                    import re
+                    blanked = re.sub(re.escape(word), "**____**", ex, flags=re.IGNORECASE)
+                    st.markdown(f"**📝 例句填空：**")
+                    st.markdown(f"> {blanked}")
+                else:
+                    st.markdown("**📝 例句填空：** —")
+
+            elif field_key == "example":
+                val = card.get("example", "")
+                st.markdown(f"**📝 完整例句：**")
+                st.markdown(f"> {val or '—'}")
+
+            elif field_key == "pos":
+                pos = card.get("pos", [])
+                pos_str = ", ".join(pos) if isinstance(pos, list) else str(pos)
+                st.markdown(f"**💡 詞性：** {pos_str or '—'}")
+
+            elif field_key == "other_forms":
+                forms = parse_other_forms(card.get("other_forms"))
+                forms_str = " / ".join(f for f in forms if f) or "—"
+                st.markdown(f"**📚 三態變化：** {forms_str}")
+
+            elif field_key == "synonyms":
+                val = card.get("synonyms", "")
+                st.markdown(f"**🔗 同義詞：** {val or '—'}")
+
+            elif field_key == "collocations":
+                val = card.get("collocations", "")
+                st.markdown(f"**🎯 慣用搭配：** {val or '—'}")
+
+    # ── 卡片主體 ──────────────────────────────────────────────
     if due_cards:
-        # 初始化 session state
         if 'card_index' not in st.session_state:
             st.session_state.card_index = 0
         if 'is_flipped' not in st.session_state:
             st.session_state.is_flipped = False
 
-        # 防止索引越界
         if st.session_state.card_index >= len(due_cards):
             st.session_state.card_index = 0
 
         current_card = due_cards[st.session_state.card_index]
 
-        # 進度列
-        st.write(f"進度：{st.session_state.card_index + 1} / {len(due_cards)}")
+        # 進度 & 模式摘要
+        scope_label = "今日到期" if st.session_state.card_scope == "due" else "全部單字"
+        front_summary = " + ".join(st.session_state.card_front_fields)
+        back_summary  = " + ".join(st.session_state.card_back_fields)
+        st.caption(f"📦 {scope_label}｜正面：{front_summary}｜反面：{back_summary}")
+        st.progress((st.session_state.card_index + 1) / len(due_cards),
+                    text=f"{st.session_state.card_index + 1} / {len(due_cards)}")
 
-        # 單字卡本體
+        # 卡片外框
         with st.container(border=True):
             if not st.session_state.is_flipped:
-                # 正面：英文單字 + 發音連結
-                st.markdown(
-                    f"<h1 style='text-align: center; font-size: 3.5rem;'>{current_card['word']}</h1>",
-                    unsafe_allow_html=True
-                )
-                st.link_button(
-                    "🔊 Cambridge Pronunciation",
-                    f"https://dictionary.cambridge.org/dictionary/english-chinese-traditional/{current_card['word'].replace(' ', '-')}"
-                )
+                render_fields(current_card, st.session_state.card_front_fields, is_front=True)
             else:
-                # 反面：完整資訊
-                st.markdown(
-                    f"<h3 style='text-align: center; color: #2d3436;'>{current_card['meaning_zh']}</h3>",
-                    unsafe_allow_html=True
-                )
-                st.write("---")
-
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown(f"**💡 詞性：** {', '.join(current_card.get('pos', []))}")
-                    st.markdown(f"**📚 三態變化：** {current_card.get('other_forms', '無')}")
-                    st.markdown(f"**🔗 同義詞：** {current_card.get('synonyms', '無')}")
-                with c2:
-                    st.markdown(f"**🎯 慣用搭配：** {current_card.get('collocations', '無')}")
-                    st.markdown(f"**📖 英文定義：** {current_card.get('meaning_en', '無')}")
-
-                st.write("---")
-                st.markdown(f"**📝 情境例句：**\n>{current_card.get('example', '無')}")
+                st.markdown("---")
+                render_fields(current_card, st.session_state.card_back_fields, is_front=False)
 
         # 控制按鈕
         st.write("")
         b1, b2, b3 = st.columns([1, 2, 1])
 
         with b1:
-            if st.button("⬅️ 上一字") and st.session_state.card_index > 0:
-                st.session_state.card_index -= 1
-                st.session_state.is_flipped = False
-                st.rerun()
+            if st.button("⬅️ 上一字"):
+                if st.session_state.card_index > 0:
+                    st.session_state.card_index -= 1
+                    st.session_state.is_flipped = False
+                    st.rerun()
 
         with b2:
-            if st.button("🔄 翻面 (Flip)"):
+            flip_label = "🔄 翻到反面" if not st.session_state.is_flipped else "🔄 翻回正面"
+            if st.button(flip_label):
                 st.session_state.is_flipped = not st.session_state.is_flipped
                 st.rerun()
 
         with b3:
-            if st.button("下一字 ➡️") and st.session_state.card_index < len(due_cards) - 1:
-                st.session_state.card_index += 1
-                st.session_state.is_flipped = False
-                st.rerun()
+            if st.button("下一字 ➡️"):
+                if st.session_state.card_index < len(due_cards) - 1:
+                    st.session_state.card_index += 1
+                    st.session_state.is_flipped = False
+                    st.rerun()
 
-        # 完成提示
+        # 全部看完提示
         if st.session_state.card_index == len(due_cards) - 1 and st.session_state.is_flipped:
             st.success("🎉 這輪預習看完了！立刻去左側進入『Flash Pulse』進行打字複習測驗吧！")
 
