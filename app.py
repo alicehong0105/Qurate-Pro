@@ -38,7 +38,20 @@ st.markdown(
             background: #0d1117 !important;
             border-right: 1px solid #21262d;
         }
-        [data-testid="stSidebar"] * {
+
+        /* 讓側邊欄的所有普通文字，都顯示柔和的米白色（#e6edf3） */
+        [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p, 
+        [data-testid="stSidebar"] span, 
+        [data-testid="stSidebar"] p {
+            color: #e6edf3 !important;
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+
+        /* 專門拯救上方 Qurate Pro 標題的顏色（如果是用 st.sidebar.markdown 寫的話） */
+        [data-testid="stSidebar"] h1, 
+        [data-testid="stSidebar"] h2, 
+        [data-testid="stSidebar"] h3 {
+            color: #00cec9 !important; /* 讓標題發出好看的極光藍 */
             font-family: 'JetBrains Mono', monospace !important;
         }
 
