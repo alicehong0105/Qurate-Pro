@@ -850,9 +850,22 @@ elif "Matrix Cards" in choice:
             if st.session_state.card_cat != "全部"
             else ""
         )
-        st.caption(
-            f"📦 {scope_label}{cat_label}｜{st.session_state.card_index + 1} / {len(due_cards)}"
+        new_index = (
+            st.slider(
+                f"📦 {scope_label}{cat_label}",
+                min_value=1,
+                max_value=len(due_cards),
+                value=st.session_state.card_index + 1,
+                format="%d 張",
+            )
+            - 1
         )
+
+        if new_index != st.session_state.card_index:
+            st.session_state.card_index = new_index
+            st.session_state.is_flipped = False
+            st.rerun()
+
         st.progress((st.session_state.card_index + 1) / len(due_cards))
 
         with st.container(border=True):
