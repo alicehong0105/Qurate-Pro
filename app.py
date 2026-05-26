@@ -239,6 +239,11 @@ def play_pronunciation(word: str):
 # 5. 登入／註冊頁面
 # ============================================================
 def show_auth_page():
+    # ── 預設帳號密碼（改這裡）──────────────────────────
+    SAVED_EMAIL = "alicehong369@gmail.com"
+    SAVED_PASSWORD = "MyPassword123!"
+    # ────────────────────────────────────────────────────
+
     st.markdown(
         """
         <div style='text-align:center; margin-top:4rem;'>
@@ -254,13 +259,38 @@ def show_auth_page():
         tab_login, tab_signup = st.tabs(["🔑 登入", "📝 註冊"])
 
         with tab_login:
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("密碼", type="password", key="login_pw")
+            # ── 自動填寫按鈕 ──────────────────────────────
+            if st.button(
+                "⚡ 快速填入已儲存帳號", use_container_width=True, key="autofill_btn"
+            ):
+                st.session_state["autofill_email"] = SAVED_EMAIL
+                st.session_state["autofill_password"] = SAVED_PASSWORD
+                st.rerun()
+
+            if st.session_state.get("autofill_email"):
+                st.success(f"✅ 已自動填入：{st.session_state['autofill_email']}")
+            # ─────────────────────────────────────────────
+
+            email = st.text_input(
+                "Email",
+                key="login_email",
+                value=st.session_state.get("autofill_email", ""),
+            )
+            password = st.text_input(
+                "密碼",
+                type="password",
+                key="login_pw",
+                value=st.session_state.get("autofill_password", ""),
+            )
+
             if st.button("登入", key="login_btn"):
                 if email and password:
                     with st.spinner("驗證中..."):
                         result = sign_in(email, password)
                     if "access_token" in result:
+                        # 登入成功後清除暫存
+                        st.session_state.pop("autofill_email", None)
+                        st.session_state.pop("autofill_password", None)
                         st.session_state.access_token = result["access_token"]
                         st.session_state.user_id = result["user"]["id"]
                         st.session_state.user_email = result["user"]["email"]
