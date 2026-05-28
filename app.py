@@ -239,8 +239,8 @@ def play_pronunciation(word: str):
 # 5. 登入／註冊頁面
 # ============================================================
 def show_auth_page():
-    SAVED_EMAIL = "alicehong369@gmail.com"
-    SAVED_PASSWORD = "MyPassword123!"
+    SAVED_EMAIL = st.secrets["autofill"]["email"]
+    SAVED_PASSWORD = st.secrets["autofill"]["password"]
 
     st.markdown(
         """
@@ -248,7 +248,7 @@ def show_auth_page():
             <div style='font-family:JetBrains Mono,monospace; font-size:2.5rem; font-weight:800; color:#00cec9; text-shadow:0 0 20px rgba(0,206,201,0.4);'>⚡ Qurate Pro</div>
             <div style='color:#8b949e; font-family:JetBrains Mono,monospace; margin-bottom:2rem;'>科學化語言學習管理系統</div>
         </div>
-    """,
+        """,
         unsafe_allow_html=True,
     )
 
@@ -257,13 +257,20 @@ def show_auth_page():
         tab_login, tab_signup = st.tabs(["🔑 登入", "📝 註冊"])
 
         with tab_login:
-            # ── 關鍵：直接寫入 widget 的 session_state key ──
-            if st.button(
-                "⚡ 快速填入已儲存帳號", use_container_width=True, key="autofill_btn"
-            ):
-                st.session_state["login_email"] = SAVED_EMAIL
-                st.session_state["login_pw"] = SAVED_PASSWORD
-                st.rerun()
+            if st.button("⚡ 快速登入（已儲存帳號）", use_container_width=True):
+                with st.spinner("登入中..."):
+                    result = sign_in(SAVED_EMAIL, SAVED_PASSWORD)
+                if "access_token" in result:
+                    st.session_state.access_token = result["access_token"]
+                    st.session_state.user_id = result["user"]["id"]
+                    st.session_state.user_email = result["user"]["email"]
+                    st.rerun()
+                else:
+                    st.error(
+                        result.get("error_description", "登入失敗，請確認帳號密碼")
+                    )
+
+            st.divider()
 
             email = st.text_input("Email", key="login_email")
             password = st.text_input("密碼", type="password", key="login_pw")
