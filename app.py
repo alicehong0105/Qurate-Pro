@@ -127,7 +127,10 @@ st.markdown(
 # ============================================================
 URL = st.secrets["connections"]["supabase"]["url"]
 KEY = st.secrets["connections"]["supabase"]["key"]
-ANTHROPIC_API_KEY = st.secrets.get("anthropic", {}).get("api_key", "")
+try:
+    ANTHROPIC_API_KEY = st.secrets["anthropic"]["api_key"]
+except (KeyError, Exception):
+    ANTHROPIC_API_KEY = ""
 
 
 def get_headers(access_token=None):
@@ -255,11 +258,9 @@ def play_pronunciation(word: str):
 def inject_sound(sound_type: str):
     """
     sound_type: 'success' | 'completion'
-    Uses Web Audio API with user-gesture unlock pattern.
+    Uses st.components.v1.html so JS actually executes (not rendered as raw text).
     """
-    import time
-
-    ts = int(time.time() * 1000)
+    import streamlit.components.v1 as components
 
     if sound_type == "success":
         freqs = [523, 659, 784, 1047]
@@ -274,64 +275,41 @@ def inject_sound(sound_type: str):
         f"{{f:{f}, t:{round(i * dur, 3)}}}" for i, f in enumerate(freqs)
     )
 
-    # Use a WAV blob approach for better cross-browser compatibility
-    # Generate a simple beep tone as WAV data
-    st.markdown(
-        f"""
-    <div id="sound_container_{ts}"></div>
-    <script>
-    (function() {{
-        function playSound() {{
-            try {{
-                var AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                var ctx = new AudioContext();
-
-                // Resume context if suspended (autoplay policy)
-                var resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-                resume.then(function() {{
-                    var notes = [{notes_js}];
-                    notes.forEach(function(n) {{
-                        var osc = ctx.createOscillator();
-                        var gain = ctx.createGain();
-                        osc.connect(gain);
-                        gain.connect(ctx.destination);
-                        osc.frequency.value = n.f;
-                        osc.type = '{osc_type}';
-                        var startTime = ctx.currentTime + n.t + 0.01;
-                        gain.gain.setValueAtTime(0.4, startTime);
-                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + {dur + 0.08});
-                        osc.start(startTime);
-                        osc.stop(startTime + {dur + 0.12});
-                    }});
+    html_code = f"""<!DOCTYPE html>
+<html><body>
+<script>
+(function() {{
+    function playSound() {{
+        try {{
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            var ctx = new AudioCtx();
+            var resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+            resume.then(function() {{
+                var notes = [{notes_js}];
+                notes.forEach(function(n) {{
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = n.f;
+                    osc.type = '{osc_type}';
+                    var t = ctx.currentTime + n.t + 0.05;
+                    gain.gain.setValueAtTime(0.4, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + {dur + 0.08});
+                    osc.start(t);
+                    osc.stop(t + {dur + 0.12});
                 }});
-            }} catch(e) {{
-                console.log('Audio error:', e);
-            }}
+            }});
+        }} catch(e) {{
+            console.warn('Audio error:', e);
         }}
-
-        // Try immediately
-        playSound();
-
-        // Also attach to next user interaction as fallback
-        var el = document.getElementById('sound_container_{ts}');
-        if (el) {{
-            var handler = function() {{
-                playSound();
-                document.removeEventListener('click', handler);
-                document.removeEventListener('keydown', handler);
-            }};
-            // Only attach fallback if not played
-            setTimeout(function() {{
-                document.addEventListener('click', handler, {{once: true}});
-                document.addEventListener('keydown', handler, {{once: true}});
-            }}, 100);
-        }}
-    }})();
-    </script>
-    """,
-        unsafe_allow_html=True,
-    )
+    }}
+    playSound();
+}})();
+</script>
+</body></html>"""
+    components.html(html_code, height=0, scrolling=False)
 
 
 # ============================================================
@@ -1018,6 +996,10 @@ elif "Matrix Cards" in choice:
                     st.rerun()
             st.stop()
 
+        # 確保 card_index 在合法範圍
+        st.session_state.card_index = max(
+            0, min(st.session_state.card_index, len(due_cards) - 1)
+        )
         current_card = due_cards[st.session_state.card_index]
         scope_label = "今日到期" if st.session_state.card_scope == "due" else "全部單字"
         cat_label = (
@@ -1025,20 +1007,25 @@ elif "Matrix Cards" in choice:
             if st.session_state.card_cat != "全部"
             else ""
         )
-        new_index = (
-            st.slider(
-                f"📦 {scope_label}{cat_label}",
-                min_value=1,
-                max_value=len(due_cards),
-                value=st.session_state.card_index + 1,
-                format="%d 張",
+        total_cards = len(due_cards)
+        slider_val = max(1, min(st.session_state.card_index + 1, total_cards))
+        if total_cards > 1:
+            new_index = (
+                st.slider(
+                    f"📦 {scope_label}{cat_label}",
+                    min_value=1,
+                    max_value=total_cards,
+                    value=slider_val,
+                    format="%d 張",
+                )
+                - 1
             )
-            - 1
-        )
-        if new_index != st.session_state.card_index:
-            st.session_state.card_index = new_index
-            st.session_state.is_flipped = False
-            st.rerun()
+            if new_index != st.session_state.card_index:
+                st.session_state.card_index = new_index
+                st.session_state.is_flipped = False
+                st.rerun()
+        else:
+            st.caption(f"📦 {scope_label}{cat_label}　1 / 1 張")
 
         st.progress((st.session_state.card_index + 1) / len(due_cards))
         with st.container(border=True):
