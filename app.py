@@ -1700,7 +1700,6 @@ elif "Flash Pulse" in choice:
 
     if submitted and ans.strip():
         if ans.strip().lower() == q["word"].lower():
-            st.success("✅ Correct!")
             inject_sound("success")
             new_m = min(5, q["mastery"] + 1)
             update_mastery_in_db(q["id"], new_m, access_token)
@@ -1708,7 +1707,10 @@ elif "Flash Pulse" in choice:
             st.session_state.hint_level = 0
             if st.session_state.pulse_session_idx >= total:
                 st.session_state.pulse_session_done = True
-            st.rerun()
+                st.rerun()
+            else:
+                st.success("✅ Correct!")
+                st.rerun()
         else:
             if hint_level < 2:
                 st.session_state.hint_level += 1
