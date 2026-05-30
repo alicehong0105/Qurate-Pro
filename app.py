@@ -305,6 +305,122 @@ def inject_sound(sound_type: str):
 
 
 # ============================================================
+# Flash Pulse 專用：勝利號角 + 爆炸粒子特效
+# ============================================================
+def inject_victory_effect():
+    import streamlit.components.v1 as components
+
+    html_code = """<!DOCTYPE html>
+<html><body style="margin:0;overflow:hidden;background:transparent">
+<canvas id="c" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999"></canvas>
+<script>
+(function(){
+  // ── 勝利號角音效（鋸齒波六音上升）──────────────────────
+  try {
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    var actx = new AudioCtx();
+    var trumpet = [
+      {f:392,t:0.00,d:0.18},{f:523,t:0.18,d:0.18},{f:659,t:0.36,d:0.18},
+      {f:784,t:0.54,d:0.30},{f:784,t:0.84,d:0.15},{f:880,t:0.99,d:0.55}
+    ];
+    trumpet.forEach(function(n){
+      var osc  = actx.createOscillator();
+      var gain = actx.createGain();
+      var dist = actx.createWaveShaper();
+      var curve = new Float32Array(256);
+      for(var i=0;i<256;i++) curve[i] = (i<128 ? i/128 : (i-256)/128) * 0.55;
+      dist.curve = curve;
+      osc.connect(dist); dist.connect(gain); gain.connect(actx.destination);
+      osc.type = 'sawtooth';
+      osc.frequency.value = n.f;
+      var t = actx.currentTime + n.t + 0.05;
+      gain.gain.setValueAtTime(0.0, t);
+      gain.gain.linearRampToValueAtTime(0.32, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + n.d + 0.08);
+      osc.start(t); osc.stop(t + n.d + 0.15);
+    });
+  } catch(e){ console.warn('audio:', e); }
+
+  // ── 爆炸粒子動畫 ──────────────────────────────────────
+  var canvas = document.getElementById('c');
+  var W = canvas.width  = window.innerWidth;
+  var H = canvas.height = window.innerHeight;
+  var cx = canvas.getContext('2d');
+
+  var COLORS = ['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#ffffff','#ffeaa7'];
+
+  function Particle(x, y){
+    this.x = x; this.y = y;
+    this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
+    var angle = Math.random() * Math.PI * 2;
+    var speed = 5 + Math.random() * 12;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - 7;
+    this.size = 5 + Math.random() * 9;
+    this.shape = Math.random() < 0.5 ? 'rect' : 'circle';
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random()-0.5) * 0.35;
+    this.life = 1.0;
+    this.decay = 0.010 + Math.random() * 0.016;
+  }
+  Particle.prototype.update = function(){
+    this.vy += 0.28;
+    this.vx *= 0.98;
+    this.x += this.vx; this.y += this.vy;
+    this.rotation += this.rotSpeed;
+    this.life -= this.decay;
+  };
+  Particle.prototype.draw = function(){
+    cx.save();
+    cx.globalAlpha = Math.max(0, this.life);
+    cx.fillStyle = this.color;
+    cx.translate(this.x, this.y);
+    cx.rotate(this.rotation);
+    if(this.shape === 'rect'){
+      cx.fillRect(-this.size/2, -this.size/4, this.size, this.size*0.45);
+    } else {
+      cx.beginPath();
+      cx.arc(0, 0, this.size/2, 0, Math.PI*2);
+      cx.fill();
+    }
+    cx.restore();
+  };
+
+  var bursts = [
+    {x: W*0.20, y: H*0.30, delay: 0},
+    {x: W*0.50, y: H*0.20, delay: 100},
+    {x: W*0.80, y: H*0.30, delay: 200},
+    {x: W*0.35, y: H*0.50, delay: 320},
+    {x: W*0.65, y: H*0.48, delay: 440},
+    {x: W*0.50, y: H*0.60, delay: 560},
+  ];
+
+  var particles = [];
+  var frame = 0;
+
+  function spawnBurst(bx, by){
+    for(var i=0;i<130;i++) particles.push(new Particle(bx, by));
+  }
+
+  function loop(){
+    cx.clearRect(0, 0, W, H);
+    bursts.forEach(function(b){
+      if(frame === b.delay) spawnBurst(b.x, b.y);
+    });
+    particles = particles.filter(function(p){ return p.life > 0; });
+    particles.forEach(function(p){ p.update(); p.draw(); });
+    frame++;
+    if(frame < 500 || particles.length > 0) requestAnimationFrame(loop);
+    else cx.clearRect(0,0,W,H);
+  }
+  loop();
+})();
+</script>
+</body></html>"""
+    components.html(html_code, height=0, scrolling=False)
+
+
+# ============================================================
 # AI 輔助學習函式
 # ============================================================
 def get_ai_help(words_list: list, api_key: str) -> str:
@@ -977,6 +1093,7 @@ elif "Matrix Cards" in choice:
         if st.session_state.card_index >= len(due_cards):
             st.session_state.card_index = len(due_cards) - 1
 
+        # Matrix Cards 完成：保留原本氣球 + triangle 音效
         if st.session_state.get("card_show_completion", False):
             inject_sound("completion")
             st.balloons()
@@ -1114,7 +1231,7 @@ elif "Flash Pulse" in choice:
         st.session_state.pulse_ai_mode = False
         st.session_state.pulse_match_mode = False
         st.session_state.pulse_ai_response = ""
-        st.session_state.prompt_expanded = {}  # ← 重置提示詞展開狀態
+        st.session_state.prompt_expanded = {}
 
     if "pulse_session_words" not in st.session_state:
         init_session()
@@ -1393,15 +1510,16 @@ elif "Flash Pulse" in choice:
         st.stop()
 
     # ══════════════════════════════════════════════════════════
-    # 測驗結束畫面
+    # 測驗結束畫面  ← Flash Pulse 專用勝利特效
     # ══════════════════════════════════════════════════════════
     if st.session_state.get("pulse_session_done", False):
         wrong_list = st.session_state.get("pulse_wrong_words", [])
         total = len(session_words)
         correct_count = total - len(wrong_list)
 
-        inject_sound("completion")
-        st.balloons()
+        # 🎺 勝利號角 + 💥 爆炸粒子（取代原本的 inject_sound("completion") + st.balloons()）
+        inject_victory_effect()
+
         st.markdown(
             f"""
         <div style="background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);
@@ -1415,9 +1533,7 @@ elif "Flash Pulse" in choice:
             unsafe_allow_html=True,
         )
 
-        # ── 錯題列表（含 BYOAI 複製提示詞）──────────────────────────
         if wrong_list:
-            # 確保 prompt_expanded 狀態存在
             if "prompt_expanded" not in st.session_state:
                 st.session_state.prompt_expanded = {}
 
