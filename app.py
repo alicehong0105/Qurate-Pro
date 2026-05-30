@@ -1410,48 +1410,72 @@ elif "Flash Pulse" in choice:
             unsafe_allow_html=True,
         )
 
-        if wrong_list:
-            st.markdown("### ❌ 答錯的單字")
-            for w in wrong_list:
-                st.markdown(
-                    f"""
-                <div class="wrong-card">
-                    <b style="color:#ff7675">{w["word"]}</b>
-                    <span style="color:#8b949e;margin-left:1rem">{w.get("meaning_zh", "")}</span>
-                    {"<br><small style='color:#636e72'>📝 " + w.get("example", "") + "</small>" if w.get("example") else ""}
+        # ── Session state 管理展開狀態 ──────────────────────────────
+if "prompt_expanded" not in st.session_state:
+    st.session_state.prompt_expanded = {}  # { word_id: bool }
+
+
+def build_prompt(
+    word: str, meaning_zh: str, meaning_en: str = "", example: str = ""
+) -> str:
+    """動態生成萬用 AI 提示詞模板"""
+    lines = [
+        "我正在學習英文單字「{word}」（中文：{meaning_zh}）。",
+        "請用繁體中文幫我：",
+        "1. 解釋這個字的核心含義與使用場景",
+        "2. 提供一個好記的記憶技巧（字根、聯想、故事或諧音皆可）",
+        "3. 給出 2 個生動的例句（附中文翻譯）",
+        "4. 列出 2-3 個常用搭配詞（collocations）",
+        "5. 提醒我這個字容易和哪些字混淆",
+    ]
+    if meaning_en:
+        lines.insert(1, f"英文定義：{meaning_en}")
+    if example:
+        lines.insert(2, f"例句參考：{example}")
+    return "\n".join(lines)
+
+
+# ── 錯題列表區塊（取代原本的 wrong_list 顯示） ──────────────
+if wrong_list:
+    st.markdown("### ❌ 答錯的單字")
+
+    for w in wrong_list:
+        word_id = str(w.get("id", w["word"]))
+        pos_list = w.get("pos", [])
+        pos_str = "　".join(pos_list) if isinstance(pos_list, list) and pos_list else ""
+        is_expanded = st.session_state.prompt_expanded.get(word_id, False)
+
+        # 卡片主體
+        col_info, col_btn = st.columns([5, 2])
+        with col_info:
+            st.markdown(
+                f"""<div class="wrong-card">
+                    <b style="color:#ff7675;font-size:1.05rem">{w["word"]}</b>
+                    {"<span style='color:#74b9ff;font-size:0.8rem;margin-left:0.6rem'>" + pos_str + "</span>" if pos_str else ""}
+                    <span style="color:#8b949e;margin-left:0.8rem">{w.get("meaning_zh", "")}</span>
+                    {"<br><small style='color:#636e72'>📝 " + w.get("example", "").replace(w["word"], "____") + "</small>" if w.get("example") else ""}
                 </div>""",
-                    unsafe_allow_html=True,
-                )
-
-            st.write("")
-            st.markdown("### 📚 繼續強化這些單字")
-            dc1, dc2, dc3 = st.columns(3)
-            with dc1:
-                if st.button("🎴 翻卡複習", use_container_width=True):
-                    st.session_state.pulse_review_mode = True
-                    st.session_state.pulse_review_idx = 0
-                    st.session_state.pulse_review_flipped = False
-                    st.rerun()
-            with dc2:
-                if st.button("🎮 連連看", use_container_width=True):
-                    st.session_state.pulse_match_mode = True
-                    st.session_state.match_reset = True
-                    st.rerun()
-            with dc3:
-                if st.button("🤖 AI 記憶輔助", use_container_width=True):
-                    st.session_state.pulse_ai_mode = True
-                    st.session_state.pulse_ai_response = ""
-                    st.rerun()
-
-            st.write("")
-            if st.button("🔄 重新測驗全部", use_container_width=True):
-                init_session()
+                unsafe_allow_html=True,
+            )
+        with col_btn:
+            btn_label = "✅ 已複製提示詞" if is_expanded else "📋 複製 AI 提示詞"
+            if st.button(
+                btn_label, key=f"prompt_btn_{word_id}", use_container_width=True
+            ):
+                # 切換展開狀態
+                st.session_state.prompt_expanded[word_id] = not is_expanded
                 st.rerun()
-        else:
-            if st.button("🔄 再來一輪", use_container_width=True):
-                init_session()
-                st.rerun()
-        st.stop()
+
+        # 展開的提示詞區塊
+        if is_expanded:
+            prompt_text = build_prompt(
+                word=w["word"],
+                meaning_zh=w.get("meaning_zh", ""),
+                meaning_en=w.get("meaning_en", ""),
+                example=w.get("example", ""),
+            )
+            st.code(prompt_text, language=None)
+            st.caption("👆 點選右上角複製圖示，貼到 ChatGPT / Gemini / Claude 即可學習")
 
     # ══════════════════════════════════════════════════════════
     # 正在作答
