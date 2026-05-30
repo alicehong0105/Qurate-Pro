@@ -23,107 +23,60 @@ st.markdown(
 
         .main-title {
             font-family: 'JetBrains Mono', monospace !important;
-            color: #00cec9;
-            font-weight: 800;
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            letter-spacing: -1px;
+            color: #00cec9; font-weight: 800; font-size: 2rem;
+            margin-bottom: 1rem; letter-spacing: -1px;
             text-shadow: 0 0 30px rgba(0,206,201,0.3);
         }
-
         .stButton > button {
-            width: 100%;
-            border-radius: 8px;
-            height: 3.2rem;
+            width: 100%; border-radius: 8px; height: 3.2rem;
             background: linear-gradient(135deg, #00cec9, #0984e3) !important;
-            color: #ffffff !important;
-            font-weight: 700;
-            border: none;
-            font-family: 'JetBrains Mono', monospace;
-            transition: all 0.2s ease;
+            color: #ffffff !important; font-weight: 700; border: none;
+            font-family: 'JetBrains Mono', monospace; transition: all 0.2s ease;
             box-shadow: 0 0 20px rgba(0,206,201,0.2);
         }
-        .stButton > button:hover {
-            box-shadow: 0 0 30px rgba(0,206,201,0.5);
-            transform: translateY(-1px);
-        }
-
+        .stButton > button:hover { box-shadow: 0 0 30px rgba(0,206,201,0.5); transform: translateY(-1px); }
         .stTabs [data-baseweb="tab-list"] { gap: 8px; border-radius: 10px; padding: 4px; }
         .stTabs [data-baseweb="tab"] { border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
         .stTabs [aria-selected="true"] { background: linear-gradient(135deg, #00cec9, #0984e3) !important; color: #ffffff !important; border-radius: 8px; font-weight: 700; }
-
         [data-testid="stVerticalBlockBorderWrapper"] {
             border: 1px solid rgba(0,206,201,0.2) !important;
-            border-radius: 12px !important;
-            box-shadow: 0 0 20px rgba(0,206,201,0.05);
+            border-radius: 12px !important; box-shadow: 0 0 20px rgba(0,206,201,0.05);
         }
-
         [data-testid="stTextInput"] input:focus,
         [data-testid="stTextArea"] textarea:focus {
-            border-color: #00cec9 !important;
-            box-shadow: 0 0 0 3px rgba(0,206,201,0.15) !important;
+            border-color: #00cec9 !important; box-shadow: 0 0 0 3px rgba(0,206,201,0.15) !important;
         }
-
         .hint-badge {
             background: linear-gradient(135deg, rgba(0,206,201,0.1), rgba(9,132,227,0.1));
-            color: #00cec9;
-            border: 1px solid #00cec9;
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            font-weight: 700;
-            margin: 0.5rem 0;
+            color: #00cec9; border: 1px solid #00cec9; border-radius: 8px;
+            padding: 0.5rem 1rem; font-weight: 700; margin: 0.5rem 0;
             font-family: 'JetBrains Mono', monospace;
         }
         .cat-badge {
-            display: inline-block;
-            background: rgba(0,206,201,0.1);
-            color: #00cec9;
-            border: 1px solid rgba(0,206,201,0.3);
-            border-radius: 20px;
-            padding: 0.2rem 0.8rem;
-            font-size: 0.78rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-family: 'JetBrains Mono', monospace;
+            display: inline-block; background: rgba(0,206,201,0.1); color: #00cec9;
+            border: 1px solid rgba(0,206,201,0.3); border-radius: 20px;
+            padding: 0.2rem 0.8rem; font-size: 0.78rem; font-weight: 600;
+            margin-bottom: 0.5rem; font-family: 'JetBrains Mono', monospace;
         }
         .tutorial-card {
             background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
-            border: 1px solid #00cec9;
-            border-radius: 16px;
-            padding: 2.5rem;
-            color: #e6edf3;
-            text-align: center;
-            margin: 1rem 0;
+            border: 1px solid #00cec9; border-radius: 16px; padding: 2.5rem;
+            color: #e6edf3; text-align: center; margin: 1rem 0;
             box-shadow: 0 0 40px rgba(0,206,201,0.15);
         }
         [data-testid="stProgressBar"] > div > div {
             background: linear-gradient(90deg, #00cec9, #0984e3) !important;
         }
-
-        /* 完成視窗樣式 */
-        .completion-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .completion-modal {
-            background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
-            border: 2px solid #00cec9;
-            border-radius: 24px;
-            padding: 3rem 3.5rem;
-            text-align: center;
-            box-shadow: 0 0 80px rgba(0,206,201,0.4);
-            max-width: 480px;
+        .wrong-card {
+            background: rgba(214,48,49,0.08);
+            border: 1px solid rgba(214,48,49,0.4);
+            border-radius: 12px; padding: 0.6rem 1rem; margin-bottom: 0.5rem;
+            font-size: 0.92rem;
         }
     </style>
 """,
     unsafe_allow_html=True,
 )
-
 
 # ============================================================
 # 2. API 設定
@@ -244,8 +197,7 @@ def play_pronunciation(word: str):
             f"""
             <audio autoplay controls style="width:100%; margin-top:0.5rem;">
                 <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-            </audio>
-        """,
+            </audio>""",
             unsafe_allow_html=True,
         )
     except Exception:
@@ -255,62 +207,51 @@ def play_pronunciation(word: str):
         )
 
 
-def play_success_sound():
-    """播放答對音效（使用 Web Audio API）"""
-    st.markdown(
-        """
-    <script>
-    (function() {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const notes = [523, 659, 784, 1047];
-            notes.forEach((freq, i) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = freq;
-                osc.type = 'sine';
-                gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.12);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
-                osc.start(ctx.currentTime + i * 0.12);
-                osc.stop(ctx.currentTime + i * 0.12 + 0.3);
-            });
-        } catch(e) {}
-    })();
-    </script>
-    """,
-        unsafe_allow_html=True,
+def inject_sound(sound_type: str):
+    """
+    sound_type: 'success' | 'completion'
+    Uses inline <audio> with base64 WAV generated via Web Audio API written to blob.
+    Falls back to oscillator approach with a unique timestamp to force re-execution.
+    """
+    import time
+
+    ts = int(time.time() * 1000)
+    if sound_type == "success":
+        # 4-note ascending fanfare: C5 E5 G5 C6
+        freqs = [523, 659, 784, 1047]
+        dur = 0.18
+    else:
+        # 10-note celebration melody
+        freqs = [523, 659, 784, 1047, 784, 1047, 1319, 1047, 1319, 1568]
+        dur = 0.15
+
+    notes_js = ", ".join(
+        f"{{f:{f}, t:{round(i * dur, 3)}}}" for i, f in enumerate(freqs)
     )
-
-
-def play_completion_sound():
-    """播放完成全部卡片的慶祝音效"""
     st.markdown(
-        """
+        f"""
+    <div id="sound_{ts}" style="display:none"></div>
     <script>
-    (function() {
-        try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const melody = [
-                [523, 0.0], [659, 0.15], [784, 0.30], [1047, 0.45],
-                [784, 0.65], [1047, 0.80], [1319, 0.95], [1047, 1.15],
-                [1319, 1.30], [1568, 1.45]
-            ];
-            melody.forEach(([freq, t]) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = freq;
-                osc.type = 'triangle';
-                gain.gain.setValueAtTime(0.4, ctx.currentTime + t);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.35);
-                osc.start(ctx.currentTime + t);
-                osc.stop(ctx.currentTime + t + 0.35);
-            });
-        } catch(e) {}
-    })();
+    (function(){{
+        var el = document.getElementById('sound_{ts}');
+        if (!el || el.dataset.played) return;
+        el.dataset.played = '1';
+        try {{
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            var notes = [{notes_js}];
+            notes.forEach(function(n) {{
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = n.f;
+                osc.type = '{"triangle" if sound_type == "completion" else "sine"}';
+                gain.gain.setValueAtTime(0.35, ctx.currentTime + n.t);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + {dur + 0.05});
+                osc.start(ctx.currentTime + n.t);
+                osc.stop(ctx.currentTime + n.t + {dur + 0.1});
+            }});
+        }} catch(e) {{ console.log('Audio error:', e); }}
+    }})();
     </script>
     """,
         unsafe_allow_html=True,
@@ -323,21 +264,17 @@ def play_completion_sound():
 def show_auth_page():
     SAVED_EMAIL = st.secrets["autofill"]["email"]
     SAVED_PASSWORD = st.secrets["autofill"]["password"]
-
     st.markdown(
         """
         <div style='text-align:center; margin-top:4rem;'>
             <div style='font-family:JetBrains Mono,monospace; font-size:2.5rem; font-weight:800; color:#00cec9; text-shadow:0 0 20px rgba(0,206,201,0.4);'>⚡ Qurate Pro</div>
             <div style='color:#8b949e; font-family:JetBrains Mono,monospace; margin-bottom:2rem;'>科學化語言學習管理系統</div>
-        </div>
-        """,
+        </div>""",
         unsafe_allow_html=True,
     )
-
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         tab_login, tab_signup = st.tabs(["🔑 登入", "📝 註冊"])
-
         with tab_login:
             if st.button("⚡ 快速登入（已儲存帳號）", use_container_width=True):
                 with st.spinner("登入中..."):
@@ -351,12 +288,9 @@ def show_auth_page():
                     st.error(
                         result.get("error_description", "登入失敗，請確認帳號密碼")
                     )
-
             st.divider()
-
             email = st.text_input("Email", key="login_email")
             password = st.text_input("密碼", type="password", key="login_pw")
-
             if st.button("登入", key="login_btn"):
                 if email and password:
                     with st.spinner("驗證中..."):
@@ -372,7 +306,6 @@ def show_auth_page():
                         )
                 else:
                     st.warning("請填寫 Email 和密碼")
-
         with tab_signup:
             new_email = st.text_input("Email", key="signup_email")
             new_password = st.text_input(
@@ -415,7 +348,6 @@ due_count = (
 )
 all_categories = get_all_categories(raw_data)
 
-
 # ============================================================
 # 7. 側邊導航
 # ============================================================
@@ -432,9 +364,21 @@ if st.sidebar.button("🚪 登出"):
     st.rerun()
 
 pulse_label = f"🎯 Flash Pulse {'🔴' if due_count > 0 else ''}"
-choice = st.sidebar.radio(
-    "SYSTEM ACCESS", ["📋 Matrix Core", "🎴 Matrix Cards", pulse_label, "📅 Ebbing Log"]
-)
+
+# ── 導航：支援從 Cards 跳轉到 Pulse ──
+_default_nav = st.session_state.pop("_nav_force", None)
+nav_options = ["📋 Matrix Core", "🎴 Matrix Cards", pulse_label, "📅 Ebbing Log"]
+if _default_nav and _default_nav in nav_options:
+    _nav_idx = nav_options.index(_default_nav)
+else:
+    _nav_idx = (
+        nav_options.index(st.session_state.get("_nav_current", nav_options[0]))
+        if st.session_state.get("_nav_current") in nav_options
+        else 0
+    )
+
+choice = st.sidebar.radio("SYSTEM ACCESS", nav_options, index=_nav_idx)
+st.session_state["_nav_current"] = choice
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**📂 類別篩選**")
@@ -444,10 +388,8 @@ sidebar_cat = st.sidebar.selectbox(
     key="sidebar_cat_filter",
     label_visibility="collapsed",
 )
-
 if st.sidebar.button("🔄 Force Sync Matrix"):
     st.rerun()
-
 
 # ============================================================
 # 8. 頁面：Matrix Core
@@ -463,7 +405,6 @@ if "Matrix Core" in choice:
             c1, c2 = st.columns(2)
             f_word = c1.text_input("Entry（單字）*")
             f_mean = c2.text_input("Definition（中文）*")
-
             st.write("---")
             ca1, ca2 = st.columns(2)
             with ca1:
@@ -483,26 +424,21 @@ if "Matrix Core" in choice:
                 if f_cat_select == "＋ 新增類別" and f_cat_new.strip()
                 else (f_cat_select if f_cat_select != "＋ 新增類別" else "預設")
             )
-
             st.write("---")
             st.caption("Morphology（動詞三態變化）")
             v1, v2, v3 = st.columns(3)
             f_v1 = v1.text_input("V1 (Base)")
             f_v2 = v2.text_input("V2 (Past)")
             f_v3 = v3.text_input("V3 (Participle)")
-
             st.write("---")
             f_pos = st.multiselect(
                 "Class（詞性）", ["n.", "v.", "adj.", "adv.", "phr.", "prep."]
             )
-
             c3, c4 = st.columns(2)
             f_syn = c3.text_input("Synonyms（同義詞）")
             f_coll = c4.text_input("Collocations（慣用搭配）")
-
             f_en = st.text_area("English Definition（英文定義）")
             f_ex = st.text_area("Context Example（例句）")
-
             if st.form_submit_button("🚀 SYNC TO CORE"):
                 if f_word.strip() and f_mean.strip():
                     payload = {
@@ -548,7 +484,6 @@ if "Matrix Core" in choice:
                     ["Due Today", "All Nodes", "L5 Mastered"],
                     horizontal=True,
                 )
-
             d_df = df.copy()
             if view_cat != "全部":
                 d_df = d_df[d_df["category"] == view_cat]
@@ -556,7 +491,6 @@ if "Matrix Core" in choice:
                 d_df = d_df[pd.to_datetime(d_df["next_review"]).dt.date <= date.today()]
             elif v_f == "L5 Mastered":
                 d_df = d_df[d_df["mastery"] >= 5]
-
             st.caption(f"顯示 {len(d_df)} 筆")
             display_cols = [
                 "word",
@@ -581,7 +515,6 @@ if "Matrix Core" in choice:
                 if edit_cat_filter != "全部"
                 else df["word"].tolist()
             )
-
             if not word_options:
                 st.info("此類別目前沒有單字。")
             else:
@@ -589,24 +522,20 @@ if "Matrix Core" in choice:
                 row = df[df["word"] == target_word].iloc[0]
                 v_parts = parse_other_forms(row.get("other_forms"))
                 current_cat = row.get("category") or "預設"
-
                 st.markdown(
                     f"<span class='cat-badge'>📂 {current_cat}</span>",
                     unsafe_allow_html=True,
                 )
-
                 col_pron, _ = st.columns([1, 2])
                 with col_pron:
                     if st.button(f"🔊 播放發音：{target_word}"):
                         play_pronunciation(target_word)
-
                 with st.form("edit_matrix_form"):
                     e1, e2 = st.columns(2)
                     u_word = e1.text_input("Entry（單字）*", value=row["word"])
                     u_mean = e2.text_input(
                         "Definition（中文）*", value=row["meaning_zh"]
                     )
-
                     ea1, ea2 = st.columns(2)
                     with ea1:
                         cat_index = (
@@ -635,19 +564,16 @@ if "Matrix Core" in choice:
                             else current_cat
                         )
                     )
-
                     dt_cur = datetime.strptime(
                         str(row["next_review"])[:10], "%Y-%m-%d"
                     ).date()
                     u_date = st.date_input("Manual Schedule（複習日期）", value=dt_cur)
-
                     st.write("---")
                     st.caption("Morphology（動詞三態變化）")
                     ev1, ev2, ev3 = st.columns(3)
                     u_v1 = ev1.text_input("V1 (Base)", value=v_parts[0])
                     u_v2 = ev2.text_input("V2 (Past)", value=v_parts[1])
                     u_v3 = ev3.text_input("V3 (Participle)", value=v_parts[2])
-
                     st.write("---")
                     pos_options = ["n.", "v.", "adj.", "adv.", "phr.", "prep."]
                     db_pos = row.get("pos", [])
@@ -664,7 +590,6 @@ if "Matrix Core" in choice:
                     u_pos = st.multiselect(
                         "Class（詞性）", pos_options, default=current_pos
                     )
-
                     ec3, ec4 = st.columns(2)
                     u_syn = ec3.text_input(
                         "Synonyms", value=row.get("synonyms", "") or ""
@@ -678,7 +603,6 @@ if "Matrix Core" in choice:
                     u_ex = st.text_area(
                         "Context Example", value=row.get("example", "") or ""
                     )
-
                     if st.form_submit_button("✅ UPDATE MATRIX"):
                         upd_payload = {
                             "word": u_word,
@@ -753,14 +677,13 @@ elif "Matrix Cards" in choice:
         },
     ]
 
-    if "card_tutorial_done" not in st.session_state:
-        st.session_state.card_tutorial_done = False
-    if "card_tutorial_step" not in st.session_state:
-        st.session_state.card_tutorial_step = 0
-
-    # 初始化完成視窗狀態
-    if "card_show_completion" not in st.session_state:
-        st.session_state.card_show_completion = False
+    for k, v in [
+        ("card_tutorial_done", False),
+        ("card_tutorial_step", 0),
+        ("card_show_completion", False),
+    ]:
+        if k not in st.session_state:
+            st.session_state[k] = v
 
     if not st.session_state.card_tutorial_done:
         step = st.session_state.card_tutorial_step
@@ -771,8 +694,7 @@ elif "Matrix Cards" in choice:
                 <div style="font-size:4rem">{s["icon"]}</div>
                 <div style="font-size:1.6rem;font-weight:800;margin:0.5rem 0">{s["title"]}</div>
                 <div style="opacity:0.85;line-height:1.6">{s["desc"].replace(chr(10), "<br>")}</div>
-            </div>
-        """,
+            </div>""",
             unsafe_allow_html=True,
         )
         st.progress(
@@ -823,7 +745,6 @@ elif "Matrix Cards" in choice:
                 key="back_select",
                 label_visibility="collapsed",
             )
-
         col_scope, col_cat, col_confirm = st.columns([1, 1, 1])
         with col_scope:
             card_scope = st.radio(
@@ -861,25 +782,20 @@ elif "Matrix Cards" in choice:
             st.session_state.card_tutorial_step = 0
             st.rerun()
 
-    if "card_front_fields" not in st.session_state:
-        st.session_state.card_front_fields = ["🇹🇼 中文定義"]
-    if "card_back_fields" not in st.session_state:
-        st.session_state.card_back_fields = [
-            "🔤 英文單字",
-            "📖 英文定義",
-            "📝 完整例句",
-        ]
-    if "card_scope" not in st.session_state:
-        st.session_state.card_scope = "due"
-    if "card_cat" not in st.session_state:
-        st.session_state.card_cat = "全部"
+    for k, v in [
+        ("card_front_fields", ["🇹🇼 中文定義"]),
+        ("card_back_fields", ["🔤 英文單字", "📖 英文定義", "📝 完整例句"]),
+        ("card_scope", "due"),
+        ("card_cat", "全部"),
+    ]:
+        if k not in st.session_state:
+            st.session_state[k] = v
 
-    if st.session_state.card_scope == "due":
-        due_cards = [
-            w for w in raw_data if str(w.get("next_review"))[:10] <= str(date.today())
-        ]
-    else:
-        due_cards = list(raw_data)
+    due_cards = (
+        [w for w in raw_data if str(w.get("next_review"))[:10] <= str(date.today())]
+        if st.session_state.card_scope == "due"
+        else list(raw_data)
+    )
     if st.session_state.card_cat != "全部":
         due_cards = [
             w
@@ -949,29 +865,21 @@ elif "Matrix Cards" in choice:
         if st.session_state.card_index >= len(due_cards):
             st.session_state.card_index = len(due_cards) - 1
 
-        # ── 完成視窗 ──────────────────────────────────────────
+        # ── 完成視窗 ─────────────────────────────────────────
         if st.session_state.get("card_show_completion", False):
-            play_completion_sound()
+            inject_sound("completion")
+            st.balloons()
             st.markdown(
                 """
-            <div style="
-                background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
-                border: 2px solid #00cec9;
-                border-radius: 24px;
-                padding: 3rem 2rem;
-                text-align: center;
-                box-shadow: 0 0 80px rgba(0,206,201,0.4);
-                margin: 2rem auto;
-                max-width: 560px;
-            ">
+            <div style="background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);
+                border:2px solid #00cec9;border-radius:24px;padding:3rem 2rem;
+                text-align:center;box-shadow:0 0 80px rgba(0,206,201,0.4);margin:2rem auto;max-width:560px;">
                 <div style="font-size:5rem;margin-bottom:0.5rem">🎉</div>
                 <div style="font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:800;color:#00cec9;margin-bottom:0.5rem">全部看完了！</div>
                 <div style="color:#8b949e;margin-bottom:2rem;font-size:1rem">太厲害了！要繼續複習還是去打字測驗？</div>
-            </div>
-            """,
+            </div>""",
                 unsafe_allow_html=True,
             )
-            st.balloons()
 
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
@@ -983,8 +891,8 @@ elif "Matrix Cards" in choice:
             with btn_col2:
                 if st.button("⚡ 去 Flash Pulse 測驗", use_container_width=True):
                     st.session_state.card_show_completion = False
-                    # 切換到 Flash Pulse 頁面（透過 session_state 重導）
-                    st.session_state["_nav_to_pulse"] = True
+                    # 強制切換到 Flash Pulse
+                    st.session_state["_nav_force"] = pulse_label
                     st.rerun()
             st.stop()
 
@@ -1005,14 +913,12 @@ elif "Matrix Cards" in choice:
             )
             - 1
         )
-
         if new_index != st.session_state.card_index:
             st.session_state.card_index = new_index
             st.session_state.is_flipped = False
             st.rerun()
 
         st.progress((st.session_state.card_index + 1) / len(due_cards))
-
         with st.container(border=True):
             if not st.session_state.is_flipped:
                 render_fields(
@@ -1044,10 +950,8 @@ elif "Matrix Cards" in choice:
                     st.session_state.is_flipped = False
                     st.rerun()
                 else:
-                    # 最後一張按下一字 → 顯示完成視窗
                     st.session_state.card_show_completion = True
                     st.rerun()
-
     else:
         st.success("✨ 目前沒有符合條件的單字卡！")
 
@@ -1055,12 +959,17 @@ elif "Matrix Cards" in choice:
 # ============================================================
 # 10. 頁面：Flash Pulse
 # ============================================================
-elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
-    # 清除導航旗標
-    if st.session_state.get("_nav_to_pulse", False):
-        st.session_state.pop("_nav_to_pulse", None)
-
+elif "Flash Pulse" in choice:
     st.markdown("<div class='main-title'>Flash Pulse</div>", unsafe_allow_html=True)
+
+    # ── 測驗模式狀態 ──────────────────────────────────────────
+    # pulse_mode: 'random' | 'session'
+    # pulse_session_words: list of word dicts (當次測驗題庫)
+    # pulse_session_idx: 目前題號
+    # pulse_wrong_words: list of word dicts (本輪答錯的)
+    # pulse_session_done: bool
+    # pulse_review_mode: bool (看答錯清單翻卡模式)
+    # pulse_review_idx: int
 
     pulse_cat = st.selectbox(
         "📂 練習類別", ["全部"] + all_categories, key="pulse_cat_filter"
@@ -1074,15 +983,52 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
         else all_due
     )
 
-    if due:
+    if not due:
+        msg = (
+            f"「{pulse_cat}」類別目前沒有待複習的單字。"
+            if pulse_cat != "全部"
+            else "Matrix Stable. No nodes due for review."
+        )
+        st.success(msg)
+        st.stop()
+
+    # ── 選擇測驗模式 ──────────────────────────────────────────
+    if "pulse_mode" not in st.session_state:
+        st.session_state.pulse_mode = "random"
+
+    mode_col1, mode_col2 = st.columns(2)
+    with mode_col1:
+        if st.button("🎲 隨機練習（舊模式）", use_container_width=True):
+            st.session_state.pulse_mode = "random"
+            st.session_state.pop("pulse_session_words", None)
+            st.session_state.pop("pulse_session_done", None)
+            st.rerun()
+    with mode_col2:
+        if st.button("📋 開始完整測驗（全部題目）", use_container_width=True):
+            shuffled = list(due)
+            random.shuffle(shuffled)
+            st.session_state.pulse_mode = "session"
+            st.session_state.pulse_session_words = shuffled
+            st.session_state.pulse_session_idx = 0
+            st.session_state.pulse_wrong_words = []
+            st.session_state.pulse_session_done = False
+            st.session_state.pulse_review_mode = False
+            st.session_state.pulse_review_idx = 0
+            st.session_state.hint_level = 0
+            st.rerun()
+
+    st.markdown("---")
+
+    # ══════════════════════════════════════════════════════════
+    # 模式 A：隨機練習
+    # ══════════════════════════════════════════════════════════
+    if st.session_state.pulse_mode == "random":
         if "pulse_word" not in st.session_state or st.session_state.get(
             "pulse_refresh", False
         ):
             st.session_state.pulse_word = random.choice(due)
             st.session_state.hint_level = 0
             st.session_state.pulse_refresh = False
-            # 清空答題欄位
-            st.session_state["pulse_input_val"] = ""
 
         q = st.session_state.pulse_word
         hint_level = st.session_state.get("hint_level", 0)
@@ -1101,7 +1047,6 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
                     f"<div class='hint-badge'>💡 字首提示：{q['word'][0].upper()}...</div>",
                     unsafe_allow_html=True,
                 )
-                # 第一次答錯後自動播放發音
                 play_pronunciation(q["word"])
             elif hint_level == 2:
                 st.markdown(
@@ -1112,15 +1057,13 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
                 f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
             )
 
-        # Enter 鍵送出：用 form 包住輸入框
-        with st.form("pulse_form", clear_on_submit=True):
+        with st.form("pulse_form_random", clear_on_submit=True):
             ans = st.text_input(
                 "Type the correct Entry（不分大小寫）:",
-                key="pulse_input",
+                key="pulse_input_r",
                 placeholder="輸入答案後按 Enter 或點「EXECUTE VERIFICATION」",
             )
             col1, col2, col3 = st.columns([2, 1, 1])
-
             with col1:
                 submitted = st.form_submit_button(
                     "EXECUTE VERIFICATION", use_container_width=True
@@ -1130,12 +1073,10 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
             with col3:
                 skip_btn = st.form_submit_button("⏭️ 跳過", use_container_width=True)
 
-        # 表單提交後的邏輯（在 form 外執行）
         if submitted and ans.strip():
             if ans.strip().lower() == q["word"].lower():
                 st.success("✅ Correct! Matrix Evolved.")
-                # 播放答對音效
-                play_success_sound()
+                inject_sound("success")
                 st.balloons()
                 new_m = min(5, q["mastery"] + 1)
                 update_mastery_in_db(q["id"], new_m, access_token)
@@ -1157,10 +1098,8 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
                     st.session_state.pulse_refresh = True
                     st.session_state.hint_level = 0
                     st.rerun()
-
         if play_btn:
             play_pronunciation(q["word"])
-
         if skip_btn:
             st.session_state.pulse_refresh = True
             st.session_state.hint_level = 0
@@ -1173,13 +1112,289 @@ elif "Flash Pulse" in choice or st.session_state.get("_nav_to_pulse", False):
             2: "🔴 英文定義已顯示（再答不出將降級）",
         }
         st.caption(f"提示狀態：{hint_status[hint_level]}")
-    else:
-        msg = (
-            f"「{pulse_cat}」類別目前沒有待複習的單字。"
-            if pulse_cat != "全部"
-            else "Matrix Stable. No nodes due for review."
-        )
-        st.success(msg)
+
+    # ══════════════════════════════════════════════════════════
+    # 模式 B：完整測驗
+    # ══════════════════════════════════════════════════════════
+    elif st.session_state.pulse_mode == "session":
+        session_words = st.session_state.get("pulse_session_words", [])
+        if not session_words:
+            st.info("請點「開始完整測驗」開始。")
+            st.stop()
+
+        # ── 翻卡複習模式（答錯清單）──────────────────────────
+        if st.session_state.get("pulse_review_mode", False):
+            wrong_list = st.session_state.get("pulse_wrong_words", [])
+            rev_idx = st.session_state.get("pulse_review_idx", 0)
+
+            if not wrong_list:
+                st.success("🎉 沒有答錯的單字，太強了！")
+                if st.button("🔄 再來一輪測驗", use_container_width=True):
+                    shuffled = list(due)
+                    random.shuffle(shuffled)
+                    st.session_state.pulse_session_words = shuffled
+                    st.session_state.pulse_session_idx = 0
+                    st.session_state.pulse_wrong_words = []
+                    st.session_state.pulse_session_done = False
+                    st.session_state.pulse_review_mode = False
+                    st.session_state.hint_level = 0
+                    st.rerun()
+                st.stop()
+
+            if rev_idx >= len(wrong_list):
+                rev_idx = 0
+                st.session_state.pulse_review_idx = 0
+
+            st.markdown(f"### 📚 答錯單字複習　{rev_idx + 1} / {len(wrong_list)}")
+            st.progress((rev_idx + 1) / len(wrong_list))
+
+            rc = wrong_list[rev_idx]
+            rev_flipped = st.session_state.get("pulse_review_flipped", False)
+
+            with st.container(border=True):
+                if not rev_flipped:
+                    # 正面：中文定義
+                    cat_display = rc.get("category") or "預設"
+                    st.markdown(
+                        f"<span class='cat-badge'>📂 {cat_display}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f"<h3 style='text-align:center'>💡 {rc['meaning_zh']}</h3>",
+                        unsafe_allow_html=True,
+                    )
+                    if rc.get("example"):
+                        st.caption(
+                            f"📝 Context: {rc['example'].replace(rc['word'], '____')}"
+                        )
+                else:
+                    # 反面：英文單字 + 其他資訊
+                    st.markdown(
+                        f"<h1 style='text-align:center;font-size:3rem;color:#00cec9'>{rc['word']}</h1>",
+                        unsafe_allow_html=True,
+                    )
+                    if rc.get("meaning_en"):
+                        st.markdown(f"**📖 英文定義：** {rc['meaning_en']}")
+                    if rc.get("example"):
+                        st.markdown(f"**📝 例句：** {rc['example']}")
+                    if rc.get("collocations"):
+                        st.markdown(f"**🎯 慣用搭配：** {rc['collocations']}")
+                    if st.button(f"🔊 播放發音", key=f"rev_pron_{rc.get('id', 'x')}"):
+                        play_pronunciation(rc["word"])
+
+            rb1, rb2, rb3 = st.columns([1, 2, 1])
+            with rb1:
+                if st.button("⬅️ 上一字", key="rev_prev") and rev_idx > 0:
+                    st.session_state.pulse_review_idx -= 1
+                    st.session_state.pulse_review_flipped = False
+                    st.rerun()
+            with rb2:
+                if st.button(
+                    "🔄 翻到反面" if not rev_flipped else "🔄 翻回正面", key="rev_flip"
+                ):
+                    st.session_state.pulse_review_flipped = not rev_flipped
+                    st.rerun()
+            with rb3:
+                next_label = (
+                    "下一字 ➡️" if rev_idx < len(wrong_list) - 1 else "✅ 複習完畢"
+                )
+                if st.button(next_label, key="rev_next"):
+                    if rev_idx < len(wrong_list) - 1:
+                        st.session_state.pulse_review_idx += 1
+                        st.session_state.pulse_review_flipped = False
+                        st.rerun()
+                    else:
+                        # 複習完畢 → 重新測驗
+                        shuffled = list(due)
+                        random.shuffle(shuffled)
+                        st.session_state.pulse_session_words = shuffled
+                        st.session_state.pulse_session_idx = 0
+                        st.session_state.pulse_wrong_words = []
+                        st.session_state.pulse_session_done = False
+                        st.session_state.pulse_review_mode = False
+                        st.session_state.pulse_review_flipped = False
+                        st.session_state.hint_level = 0
+                        st.rerun()
+            st.stop()
+
+        # ── 測驗結束畫面 ─────────────────────────────────────
+        if st.session_state.get("pulse_session_done", False):
+            wrong_list = st.session_state.get("pulse_wrong_words", [])
+            total = len(session_words)
+            correct_count = total - len(wrong_list)
+
+            inject_sound("completion")
+            st.balloons()
+            st.markdown(
+                f"""
+            <div style="background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);
+                border:2px solid #00cec9;border-radius:24px;padding:2.5rem 2rem;
+                text-align:center;box-shadow:0 0 60px rgba(0,206,201,0.4);margin-bottom:1.5rem;">
+                <div style="font-size:4rem">{"🏆" if not wrong_list else "📝"}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;color:#00cec9;margin:0.5rem 0">測驗完成！</div>
+                <div style="font-size:2rem;font-weight:800;color:#55efc4">{correct_count} / {total} 答對</div>
+                <div style="color:#8b949e;margin-top:0.5rem">{"全部答對，超厲害！🎉" if not wrong_list else f"有 {len(wrong_list)} 個單字需要加強複習"}</div>
+            </div>""",
+                unsafe_allow_html=True,
+            )
+
+            if wrong_list:
+                st.markdown("### ❌ 答錯的單字")
+                for w in wrong_list:
+                    st.markdown(
+                        f"""
+                    <div class="wrong-card">
+                        <b style="color:#ff7675">{w["word"]}</b>
+                        <span style="color:#8b949e;margin-left:1rem">{w.get("meaning_zh", "")}</span>
+                        {"<br><small style='color:#636e72'>📝 " + w.get("example", "") + "</small>" if w.get("example") else ""}
+                    </div>""",
+                        unsafe_allow_html=True,
+                    )
+
+                st.write("")
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    if st.button("🎴 翻卡複習答錯單字", use_container_width=True):
+                        st.session_state.pulse_review_mode = True
+                        st.session_state.pulse_review_idx = 0
+                        st.session_state.pulse_review_flipped = False
+                        st.rerun()
+                with dc2:
+                    if st.button("🔄 重新測驗全部", use_container_width=True):
+                        shuffled = list(due)
+                        random.shuffle(shuffled)
+                        st.session_state.pulse_session_words = shuffled
+                        st.session_state.pulse_session_idx = 0
+                        st.session_state.pulse_wrong_words = []
+                        st.session_state.pulse_session_done = False
+                        st.session_state.hint_level = 0
+                        st.rerun()
+            else:
+                if st.button("🔄 再來一輪", use_container_width=True):
+                    shuffled = list(due)
+                    random.shuffle(shuffled)
+                    st.session_state.pulse_session_words = shuffled
+                    st.session_state.pulse_session_idx = 0
+                    st.session_state.pulse_wrong_words = []
+                    st.session_state.pulse_session_done = False
+                    st.session_state.hint_level = 0
+                    st.rerun()
+            st.stop()
+
+        # ── 正在作答 ─────────────────────────────────────────
+        idx = st.session_state.pulse_session_idx
+        if idx >= len(session_words):
+            st.session_state.pulse_session_done = True
+            st.rerun()
+
+        q = session_words[idx]
+        hint_level = st.session_state.get("hint_level", 0)
+        total = len(session_words)
+        wrong_so_far = len(st.session_state.get("pulse_wrong_words", []))
+
+        st.markdown(f"**進度：{idx + 1} / {total}　｜　已答錯：{wrong_so_far} 個**")
+        st.progress((idx + 1) / total)
+
+        # 放棄鍵
+        abandon_col, _ = st.columns([1, 3])
+        with abandon_col:
+            if st.button("🏳️ 放棄測驗", use_container_width=True):
+                st.session_state.pulse_session_done = True
+                st.rerun()
+
+        with st.container(border=True):
+            cat_display = q.get("category") or "預設"
+            st.markdown(
+                f"<span class='cat-badge'>📂 {cat_display}</span>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(f"### 💡 中文提示：**{q['meaning_zh']}**")
+            if q.get("example"):
+                st.caption(f"📝 Context: {q['example'].replace(q['word'], '____')}")
+            if hint_level == 1:
+                st.markdown(
+                    f"<div class='hint-badge'>💡 字首提示：{q['word'][0].upper()}...</div>",
+                    unsafe_allow_html=True,
+                )
+                play_pronunciation(q["word"])
+            elif hint_level == 2:
+                st.markdown(
+                    f"<div class='hint-badge'>📖 英文定義：{q.get('meaning_en', '（無英文定義）')}</div>",
+                    unsafe_allow_html=True,
+                )
+            st.caption(
+                f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
+            )
+
+        with st.form("pulse_form_session", clear_on_submit=True):
+            ans = st.text_input(
+                "Type the correct Entry（不分大小寫）:",
+                key="pulse_input_s",
+                placeholder="輸入答案後按 Enter 送出",
+            )
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                submitted = st.form_submit_button(
+                    "EXECUTE VERIFICATION", use_container_width=True
+                )
+            with col2:
+                play_btn = st.form_submit_button("🔊 發音", use_container_width=True)
+            with col3:
+                skip_btn = st.form_submit_button(
+                    "⏭️ 跳過（計錯）", use_container_width=True
+                )
+
+        if submitted and ans.strip():
+            if ans.strip().lower() == q["word"].lower():
+                st.success("✅ Correct!")
+                inject_sound("success")
+                new_m = min(5, q["mastery"] + 1)
+                update_mastery_in_db(q["id"], new_m, access_token)
+                st.session_state.pulse_session_idx += 1
+                st.session_state.hint_level = 0
+                if st.session_state.pulse_session_idx >= total:
+                    st.session_state.pulse_session_done = True
+                st.rerun()
+            else:
+                if hint_level < 2:
+                    st.session_state.hint_level += 1
+                    st.warning(f"❌ 答錯！給你提示 {st.session_state.hint_level}/2")
+                    st.rerun()
+                else:
+                    current_m = q.get("mastery", 1)
+                    new_m = calculate_new_mastery(current_m)
+                    update_mastery_in_db(q["id"], new_m, access_token)
+                    st.error(
+                        f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
+                    )
+                    wrong_list = st.session_state.get("pulse_wrong_words", [])
+                    wrong_list.append(q)
+                    st.session_state.pulse_wrong_words = wrong_list
+                    st.session_state.pulse_session_idx += 1
+                    st.session_state.hint_level = 0
+                    if st.session_state.pulse_session_idx >= total:
+                        st.session_state.pulse_session_done = True
+                    st.rerun()
+
+        if play_btn:
+            play_pronunciation(q["word"])
+        if skip_btn:
+            wrong_list = st.session_state.get("pulse_wrong_words", [])
+            wrong_list.append(q)
+            st.session_state.pulse_wrong_words = wrong_list
+            st.session_state.pulse_session_idx += 1
+            st.session_state.hint_level = 0
+            if st.session_state.pulse_session_idx >= total:
+                st.session_state.pulse_session_done = True
+            st.rerun()
+
+        st.markdown("---")
+        hint_status = {
+            0: "🟢 無提示",
+            1: "🟡 字首已顯示",
+            2: "🔴 英文定義已顯示（再答不出將降級）",
+        }
+        st.caption(f"提示狀態：{hint_status[hint_level]}")
 
 
 # ============================================================
@@ -1277,7 +1492,6 @@ elif "Ebbing Log" in choice:
 
         st.write("")
         st.divider()
-
         col_left, col_right = st.columns([3, 2])
 
         with col_left:
@@ -1335,6 +1549,5 @@ elif "Ebbing Log" in choice:
                     f"</div>",
                     unsafe_allow_html=True,
                 )
-
     else:
         st.info("Insufficient data for log prediction.")
