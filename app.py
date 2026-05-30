@@ -73,6 +73,50 @@ st.markdown(
             border-radius: 12px; padding: 0.6rem 1rem; margin-bottom: 0.5rem;
             font-size: 0.92rem;
         }
+
+        /* 連連看樣式 */
+        .match-btn-left {
+            background: rgba(0,206,201,0.1) !important;
+            border: 1px solid rgba(0,206,201,0.4) !important;
+            color: #00cec9 !important;
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+        .match-btn-right {
+            background: rgba(9,132,227,0.1) !important;
+            border: 1px solid rgba(9,132,227,0.4) !important;
+            color: #74b9ff !important;
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+        .match-btn-selected {
+            background: rgba(0,206,201,0.3) !important;
+            border: 2px solid #00cec9 !important;
+            box-shadow: 0 0 15px rgba(0,206,201,0.5) !important;
+        }
+        .match-btn-matched {
+            background: rgba(85,239,196,0.15) !important;
+            border: 1px solid #55efc4 !important;
+            color: #55efc4 !important;
+            opacity: 0.6;
+        }
+        .match-btn-wrong {
+            background: rgba(214,48,49,0.2) !important;
+            border: 2px solid #d63031 !important;
+            animation: shake 0.3s ease;
+        }
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* AI 對話氣泡 */
+        .ai-bubble {
+            background: linear-gradient(135deg, rgba(0,206,201,0.08), rgba(9,132,227,0.08));
+            border: 1px solid rgba(0,206,201,0.3);
+            border-radius: 16px; padding: 1rem 1.2rem;
+            margin: 0.5rem 0; font-size: 0.95rem; line-height: 1.6;
+            color: #e6edf3;
+        }
     </style>
 """,
     unsafe_allow_html=True,
@@ -83,6 +127,7 @@ st.markdown(
 # ============================================================
 URL = st.secrets["connections"]["supabase"]["url"]
 KEY = st.secrets["connections"]["supabase"]["key"]
+ANTHROPIC_API_KEY = st.secrets.get("anthropic", {}).get("api_key", "")
 
 
 def get_headers(access_token=None):
@@ -210,52 +255,132 @@ def play_pronunciation(word: str):
 def inject_sound(sound_type: str):
     """
     sound_type: 'success' | 'completion'
-    Uses inline <audio> with base64 WAV generated via Web Audio API written to blob.
-    Falls back to oscillator approach with a unique timestamp to force re-execution.
+    Uses Web Audio API with user-gesture unlock pattern.
     """
     import time
 
     ts = int(time.time() * 1000)
+
     if sound_type == "success":
-        # 4-note ascending fanfare: C5 E5 G5 C6
         freqs = [523, 659, 784, 1047]
         dur = 0.18
+        osc_type = "sine"
     else:
-        # 10-note celebration melody
         freqs = [523, 659, 784, 1047, 784, 1047, 1319, 1047, 1319, 1568]
         dur = 0.15
+        osc_type = "triangle"
 
     notes_js = ", ".join(
         f"{{f:{f}, t:{round(i * dur, 3)}}}" for i, f in enumerate(freqs)
     )
+
+    # Use a WAV blob approach for better cross-browser compatibility
+    # Generate a simple beep tone as WAV data
     st.markdown(
         f"""
-    <div id="sound_{ts}" style="display:none"></div>
+    <div id="sound_container_{ts}"></div>
     <script>
-    (function(){{
-        var el = document.getElementById('sound_{ts}');
-        if (!el || el.dataset.played) return;
-        el.dataset.played = '1';
-        try {{
-            var ctx = new (window.AudioContext || window.webkitAudioContext)();
-            var notes = [{notes_js}];
-            notes.forEach(function(n) {{
-                var osc = ctx.createOscillator();
-                var gain = ctx.createGain();
-                osc.connect(gain); gain.connect(ctx.destination);
-                osc.frequency.value = n.f;
-                osc.type = '{"triangle" if sound_type == "completion" else "sine"}';
-                gain.gain.setValueAtTime(0.35, ctx.currentTime + n.t);
-                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.t + {dur + 0.05});
-                osc.start(ctx.currentTime + n.t);
-                osc.stop(ctx.currentTime + n.t + {dur + 0.1});
-            }});
-        }} catch(e) {{ console.log('Audio error:', e); }}
+    (function() {{
+        function playSound() {{
+            try {{
+                var AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                var ctx = new AudioContext();
+
+                // Resume context if suspended (autoplay policy)
+                var resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+                resume.then(function() {{
+                    var notes = [{notes_js}];
+                    notes.forEach(function(n) {{
+                        var osc = ctx.createOscillator();
+                        var gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.frequency.value = n.f;
+                        osc.type = '{osc_type}';
+                        var startTime = ctx.currentTime + n.t + 0.01;
+                        gain.gain.setValueAtTime(0.4, startTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + {dur + 0.08});
+                        osc.start(startTime);
+                        osc.stop(startTime + {dur + 0.12});
+                    }});
+                }});
+            }} catch(e) {{
+                console.log('Audio error:', e);
+            }}
+        }}
+
+        // Try immediately
+        playSound();
+
+        // Also attach to next user interaction as fallback
+        var el = document.getElementById('sound_container_{ts}');
+        if (el) {{
+            var handler = function() {{
+                playSound();
+                document.removeEventListener('click', handler);
+                document.removeEventListener('keydown', handler);
+            }};
+            // Only attach fallback if not played
+            setTimeout(function() {{
+                document.addEventListener('click', handler, {{once: true}});
+                document.addEventListener('keydown', handler, {{once: true}});
+            }}, 100);
+        }}
     }})();
     </script>
     """,
         unsafe_allow_html=True,
     )
+
+
+# ============================================================
+# AI 輔助學習函式
+# ============================================================
+def get_ai_help(words_list: list, api_key: str) -> str:
+    """Call Anthropic API to get AI-assisted learning content for wrong words."""
+    if not api_key:
+        return "（未設定 Anthropic API Key，無法使用 AI 輔助）"
+
+    words_str = "\n".join(
+        [
+            f"- {w['word']}：{w.get('meaning_zh', '')}（{w.get('meaning_en', '') or ''}）"
+            for w in words_list
+        ]
+    )
+
+    prompt = f"""你是一位專業的英文老師。學生剛剛在測驗中答錯了以下單字：
+
+{words_str}
+
+請用繁體中文，針對這些答錯的單字，提供：
+1. 每個單字的記憶小技巧（字源、聯想、諧音、或故事）
+2. 一個生動的例句（附中文翻譯）
+3. 常見錯誤或混淆點（如果有的話）
+
+格式清晰易讀，用 emoji 增加趣味性。每個單字獨立一段，最後給一個簡短的鼓勵。"""
+
+    try:
+        resp = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-opus-4-5",
+                "max_tokens": 1500,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=30,
+        )
+        data = resp.json()
+        if "content" in data and data["content"]:
+            return data["content"][0].get("text", "AI 回應解析失敗")
+        return f"API 錯誤：{data.get('error', {}).get('message', '未知錯誤')}"
+    except Exception as e:
+        return f"連線錯誤：{str(e)}"
 
 
 # ============================================================
@@ -365,7 +490,6 @@ if st.sidebar.button("🚪 登出"):
 
 pulse_label = f"🎯 Flash Pulse {'🔴' if due_count > 0 else ''}"
 
-# ── 導航：支援從 Cards 跳轉到 Pulse ──
 _default_nav = st.session_state.pop("_nav_force", None)
 nav_options = ["📋 Matrix Core", "🎴 Matrix Cards", pulse_label, "📅 Ebbing Log"]
 if _default_nav and _default_nav in nav_options:
@@ -865,7 +989,6 @@ elif "Matrix Cards" in choice:
         if st.session_state.card_index >= len(due_cards):
             st.session_state.card_index = len(due_cards) - 1
 
-        # ── 完成視窗 ─────────────────────────────────────────
         if st.session_state.get("card_show_completion", False):
             inject_sound("completion")
             st.balloons()
@@ -891,7 +1014,6 @@ elif "Matrix Cards" in choice:
             with btn_col2:
                 if st.button("⚡ 去 Flash Pulse 測驗", use_container_width=True):
                     st.session_state.card_show_completion = False
-                    # 強制切換到 Flash Pulse
                     st.session_state["_nav_force"] = pulse_label
                     st.rerun()
             st.stop()
@@ -957,19 +1079,10 @@ elif "Matrix Cards" in choice:
 
 
 # ============================================================
-# 10. 頁面：Flash Pulse
+# 10. 頁面：Flash Pulse（單一測驗模式）
 # ============================================================
 elif "Flash Pulse" in choice:
     st.markdown("<div class='main-title'>Flash Pulse</div>", unsafe_allow_html=True)
-
-    # ── 測驗模式狀態 ──────────────────────────────────────────
-    # pulse_mode: 'random' | 'session'
-    # pulse_session_words: list of word dicts (當次測驗題庫)
-    # pulse_session_idx: 目前題號
-    # pulse_wrong_words: list of word dicts (本輪答錯的)
-    # pulse_session_done: bool
-    # pulse_review_mode: bool (看答錯清單翻卡模式)
-    # pulse_review_idx: int
 
     pulse_cat = st.selectbox(
         "📂 練習類別", ["全部"] + all_categories, key="pulse_cat_filter"
@@ -992,393 +1105,390 @@ elif "Flash Pulse" in choice:
         st.success(msg)
         st.stop()
 
-    # ── 選擇測驗模式 ──────────────────────────────────────────
-    if "pulse_mode" not in st.session_state:
-        st.session_state.pulse_mode = "random"
+    # ── 初始化 session state ──────────────────────────────────
+    def init_session():
+        shuffled = list(due)
+        random.shuffle(shuffled)
+        st.session_state.pulse_session_words = shuffled
+        st.session_state.pulse_session_idx = 0
+        st.session_state.pulse_wrong_words = []
+        st.session_state.pulse_session_done = False
+        st.session_state.pulse_review_mode = False
+        st.session_state.pulse_review_idx = 0
+        st.session_state.pulse_review_flipped = False
+        st.session_state.hint_level = 0
+        st.session_state.pulse_ai_mode = False
+        st.session_state.pulse_match_mode = False
+        st.session_state.pulse_ai_response = ""
 
-    mode_col1, mode_col2 = st.columns(2)
-    with mode_col1:
-        if st.button("🎲 隨機練習（舊模式）", use_container_width=True):
-            st.session_state.pulse_mode = "random"
-            st.session_state.pop("pulse_session_words", None)
-            st.session_state.pop("pulse_session_done", None)
-            st.rerun()
-    with mode_col2:
-        if st.button("📋 開始完整測驗（全部題目）", use_container_width=True):
-            shuffled = list(due)
-            random.shuffle(shuffled)
-            st.session_state.pulse_mode = "session"
-            st.session_state.pulse_session_words = shuffled
-            st.session_state.pulse_session_idx = 0
-            st.session_state.pulse_wrong_words = []
-            st.session_state.pulse_session_done = False
-            st.session_state.pulse_review_mode = False
-            st.session_state.pulse_review_idx = 0
-            st.session_state.hint_level = 0
-            st.rerun()
+    if "pulse_session_words" not in st.session_state:
+        init_session()
+
+    # 重新開始按鈕
+    if st.button("🔄 重新開始測驗（今日到期單字）", use_container_width=True):
+        init_session()
+        st.rerun()
 
     st.markdown("---")
 
+    session_words = st.session_state.get("pulse_session_words", [])
+    if not session_words:
+        init_session()
+        st.rerun()
+
     # ══════════════════════════════════════════════════════════
-    # 模式 A：隨機練習
+    # 連連看模式
     # ══════════════════════════════════════════════════════════
-    if st.session_state.pulse_mode == "random":
-        if "pulse_word" not in st.session_state or st.session_state.get(
-            "pulse_refresh", False
-        ):
-            st.session_state.pulse_word = random.choice(due)
-            st.session_state.hint_level = 0
-            st.session_state.pulse_refresh = False
-
-        q = st.session_state.pulse_word
-        hint_level = st.session_state.get("hint_level", 0)
-
-        with st.container(border=True):
-            cat_display = q.get("category") or "預設"
-            st.markdown(
-                f"<span class='cat-badge'>📂 {cat_display}</span>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(f"### 💡 中文提示：**{q['meaning_zh']}**")
-            if q.get("example"):
-                st.caption(f"📝 Context: {q['example'].replace(q['word'], '____')}")
-            if hint_level == 1:
-                st.markdown(
-                    f"<div class='hint-badge'>💡 字首提示：{q['word'][0].upper()}...</div>",
-                    unsafe_allow_html=True,
-                )
-                play_pronunciation(q["word"])
-            elif hint_level == 2:
-                st.markdown(
-                    f"<div class='hint-badge'>📖 英文定義：{q.get('meaning_en', '（無英文定義）')}</div>",
-                    unsafe_allow_html=True,
-                )
-            st.caption(
-                f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
-            )
-
-        with st.form("pulse_form_random", clear_on_submit=True):
-            ans = st.text_input(
-                "Type the correct Entry（不分大小寫）:",
-                key="pulse_input_r",
-                placeholder="輸入答案後按 Enter 或點「EXECUTE VERIFICATION」",
-            )
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                submitted = st.form_submit_button(
-                    "EXECUTE VERIFICATION", use_container_width=True
-                )
-            with col2:
-                play_btn = st.form_submit_button("🔊 發音", use_container_width=True)
-            with col3:
-                skip_btn = st.form_submit_button("⏭️ 跳過", use_container_width=True)
-
-        if submitted and ans.strip():
-            if ans.strip().lower() == q["word"].lower():
-                st.success("✅ Correct! Matrix Evolved.")
-                inject_sound("success")
-                st.balloons()
-                new_m = min(5, q["mastery"] + 1)
-                update_mastery_in_db(q["id"], new_m, access_token)
-                st.session_state.pulse_refresh = True
-                st.session_state.hint_level = 0
-                st.rerun()
-            else:
-                if hint_level < 2:
-                    st.session_state.hint_level += 1
-                    st.warning(f"❌ 答錯！給你提示 {st.session_state.hint_level}/2")
-                    st.rerun()
-                else:
-                    current_m = q.get("mastery", 1)
-                    new_m = calculate_new_mastery(current_m)
-                    update_mastery_in_db(q["id"], new_m, access_token)
-                    st.error(
-                        f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
-                    )
-                    st.session_state.pulse_refresh = True
-                    st.session_state.hint_level = 0
-                    st.rerun()
-        if play_btn:
-            play_pronunciation(q["word"])
-        if skip_btn:
-            st.session_state.pulse_refresh = True
-            st.session_state.hint_level = 0
+    if st.session_state.get("pulse_match_mode", False):
+        wrong_list = st.session_state.get("pulse_wrong_words", [])
+        if not wrong_list:
+            st.session_state.pulse_match_mode = False
             st.rerun()
 
-        st.markdown("---")
-        hint_status = {
-            0: "🟢 無提示",
-            1: "🟡 字首已顯示",
-            2: "🔴 英文定義已顯示（再答不出將降級）",
-        }
-        st.caption(f"提示狀態：{hint_status[hint_level]}")
+        st.markdown("### 🎮 連連看：英文配中文")
+        st.caption("點選左欄的英文單字，再點右欄對應的中文定義")
+
+        # 初始化連連看狀態
+        if "match_pairs" not in st.session_state or st.session_state.get(
+            "match_reset", False
+        ):
+            sample = wrong_list[: min(8, len(wrong_list))]
+            left_items = [w["word"] for w in sample]
+            right_items = [w["meaning_zh"] for w in sample]
+            random.shuffle(right_items)
+            st.session_state.match_pairs = {w["word"]: w["meaning_zh"] for w in sample}
+            st.session_state.match_left = left_items
+            st.session_state.match_right = right_items
+            st.session_state.match_selected_left = None
+            st.session_state.match_matched = set()
+            st.session_state.match_wrong_flash = set()
+            st.session_state.match_reset = False
+
+        pairs = st.session_state.match_pairs
+        left_items = st.session_state.match_left
+        right_items = st.session_state.match_right
+        matched = st.session_state.match_matched
+        selected_left = st.session_state.match_selected_left
+        wrong_flash = st.session_state.match_wrong_flash
+
+        total_pairs = len(left_items)
+        st.progress(
+            len(matched) / total_pairs if total_pairs > 0 else 0,
+            text=f"已配對 {len(matched)} / {total_pairs}",
+        )
+
+        col_left, col_spacer, col_right = st.columns([2, 0.2, 2])
+
+        with col_left:
+            st.markdown("**🔤 英文單字**")
+            for word in left_items:
+                if word in matched:
+                    st.markdown(
+                        f"<div style='background:rgba(85,239,196,0.15);border:1px solid #55efc4;"
+                        f"border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.4rem;"
+                        f"color:#55efc4;font-family:JetBrains Mono,monospace;opacity:0.6'>"
+                        f"✓ {word}</div>",
+                        unsafe_allow_html=True,
+                    )
+                elif word == selected_left:
+                    if st.button(
+                        f"▶ {word}", key=f"ml_{word}", use_container_width=True
+                    ):
+                        st.session_state.match_selected_left = None
+                        st.rerun()
+                else:
+                    if word in wrong_flash:
+                        st.markdown(
+                            f"<div style='background:rgba(214,48,49,0.2);border:2px solid #d63031;"
+                            f"border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.4rem;"
+                            f"color:#ff7675;font-family:JetBrains Mono,monospace'>"
+                            f"✗ {word}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        if st.button(word, key=f"ml_{word}", use_container_width=True):
+                            st.session_state.match_selected_left = word
+                            st.session_state.match_wrong_flash = set()
+                            st.rerun()
+
+        with col_right:
+            st.markdown("**🇹🇼 中文定義**")
+            for meaning in right_items:
+                # 找到這個中文對應的英文
+                matched_word = next(
+                    (w for w, m in pairs.items() if m == meaning and w in matched), None
+                )
+                if matched_word:
+                    st.markdown(
+                        f"<div style='background:rgba(85,239,196,0.15);border:1px solid #55efc4;"
+                        f"border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.4rem;"
+                        f"color:#55efc4;opacity:0.6'>"
+                        f"✓ {meaning}</div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    is_wrong = meaning in wrong_flash
+                    if is_wrong:
+                        st.markdown(
+                            f"<div style='background:rgba(214,48,49,0.2);border:2px solid #d63031;"
+                            f"border-radius:8px;padding:0.5rem 1rem;margin-bottom:0.4rem;"
+                            f"color:#ff7675'>"
+                            f"✗ {meaning}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        if st.button(
+                            meaning, key=f"mr_{meaning}", use_container_width=True
+                        ):
+                            if selected_left:
+                                correct_meaning = pairs.get(selected_left)
+                                if correct_meaning == meaning:
+                                    matched.add(selected_left)
+                                    st.session_state.match_matched = matched
+                                    st.session_state.match_selected_left = None
+                                    inject_sound("success")
+                                    if len(matched) == total_pairs:
+                                        inject_sound("completion")
+                                        st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.session_state.match_wrong_flash = {
+                                        selected_left,
+                                        meaning,
+                                    }
+                                    st.session_state.match_selected_left = None
+                                    st.rerun()
+                            else:
+                                st.info("請先點選左邊的英文單字！")
+
+        if len(matched) == total_pairs:
+            st.markdown(
+                """
+                <div style="background:linear-gradient(135deg,#161b22,#0d1117);
+                    border:2px solid #55efc4;border-radius:16px;padding:2rem;
+                    text-align:center;margin:1rem 0;">
+                    <div style="font-size:3rem">🏆</div>
+                    <div style="color:#55efc4;font-family:JetBrains Mono,monospace;font-size:1.4rem;font-weight:800">全部配對完成！</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            mc1, mc2 = st.columns(2)
+            with mc1:
+                if st.button("🔄 再玩一次連連看", use_container_width=True):
+                    st.session_state.match_reset = True
+                    st.rerun()
+            with mc2:
+                if st.button("✅ 結束複習", use_container_width=True):
+                    st.session_state.pulse_match_mode = False
+                    init_session()
+                    st.rerun()
+        else:
+            st.write("")
+            if st.button("🏳️ 離開連連看", use_container_width=True):
+                st.session_state.pulse_match_mode = False
+                st.rerun()
+        st.stop()
 
     # ══════════════════════════════════════════════════════════
-    # 模式 B：完整測驗
+    # AI 輔助學習模式
     # ══════════════════════════════════════════════════════════
-    elif st.session_state.pulse_mode == "session":
-        session_words = st.session_state.get("pulse_session_words", [])
-        if not session_words:
-            st.info("請點「開始完整測驗」開始。")
+    if st.session_state.get("pulse_ai_mode", False):
+        wrong_list = st.session_state.get("pulse_wrong_words", [])
+        st.markdown("### 🤖 AI 記憶輔助")
+        st.caption(f"針對 {len(wrong_list)} 個答錯的單字，AI 提供記憶技巧")
+
+        if not st.session_state.get("pulse_ai_response"):
+            with st.spinner("🧠 AI 正在分析你的弱點單字..."):
+                response = get_ai_help(wrong_list, ANTHROPIC_API_KEY)
+                st.session_state.pulse_ai_response = response
+
+        ai_text = st.session_state.get("pulse_ai_response", "")
+        if ai_text:
+            st.markdown(
+                f"<div class='ai-bubble'>{ai_text.replace(chr(10), '<br>')}</div>",
+                unsafe_allow_html=True,
+            )
+
+        ab1, ab2 = st.columns(2)
+        with ab1:
+            if st.button("🎮 去玩連連看", use_container_width=True):
+                st.session_state.pulse_ai_mode = False
+                st.session_state.pulse_match_mode = True
+                st.session_state.match_reset = True
+                st.rerun()
+        with ab2:
+            if st.button("🔄 重新測驗", use_container_width=True):
+                st.session_state.pulse_ai_mode = False
+                init_session()
+                st.rerun()
+        st.stop()
+
+    # ══════════════════════════════════════════════════════════
+    # 翻卡複習模式（答錯清單）
+    # ══════════════════════════════════════════════════════════
+    if st.session_state.get("pulse_review_mode", False):
+        wrong_list = st.session_state.get("pulse_wrong_words", [])
+        rev_idx = st.session_state.get("pulse_review_idx", 0)
+
+        if not wrong_list:
+            st.success("🎉 沒有答錯的單字，太強了！")
+            if st.button("🔄 再來一輪測驗", use_container_width=True):
+                init_session()
+                st.rerun()
             st.stop()
 
-        # ── 翻卡複習模式（答錯清單）──────────────────────────
-        if st.session_state.get("pulse_review_mode", False):
-            wrong_list = st.session_state.get("pulse_wrong_words", [])
-            rev_idx = st.session_state.get("pulse_review_idx", 0)
+        if rev_idx >= len(wrong_list):
+            rev_idx = 0
+            st.session_state.pulse_review_idx = 0
 
-            if not wrong_list:
-                st.success("🎉 沒有答錯的單字，太強了！")
-                if st.button("🔄 再來一輪測驗", use_container_width=True):
-                    shuffled = list(due)
-                    random.shuffle(shuffled)
-                    st.session_state.pulse_session_words = shuffled
-                    st.session_state.pulse_session_idx = 0
-                    st.session_state.pulse_wrong_words = []
-                    st.session_state.pulse_session_done = False
-                    st.session_state.pulse_review_mode = False
-                    st.session_state.hint_level = 0
-                    st.rerun()
-                st.stop()
+        st.markdown(f"### 📚 答錯單字複習　{rev_idx + 1} / {len(wrong_list)}")
+        st.progress((rev_idx + 1) / len(wrong_list))
 
-            if rev_idx >= len(wrong_list):
-                rev_idx = 0
-                st.session_state.pulse_review_idx = 0
+        rc = wrong_list[rev_idx]
+        rev_flipped = st.session_state.get("pulse_review_flipped", False)
 
-            st.markdown(f"### 📚 答錯單字複習　{rev_idx + 1} / {len(wrong_list)}")
-            st.progress((rev_idx + 1) / len(wrong_list))
-
-            rc = wrong_list[rev_idx]
-            rev_flipped = st.session_state.get("pulse_review_flipped", False)
-
-            with st.container(border=True):
-                if not rev_flipped:
-                    # 正面：中文定義
-                    cat_display = rc.get("category") or "預設"
-                    st.markdown(
-                        f"<span class='cat-badge'>📂 {cat_display}</span>",
-                        unsafe_allow_html=True,
+        with st.container(border=True):
+            if not rev_flipped:
+                cat_display = rc.get("category") or "預設"
+                st.markdown(
+                    f"<span class='cat-badge'>📂 {cat_display}</span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<h3 style='text-align:center'>💡 {rc['meaning_zh']}</h3>",
+                    unsafe_allow_html=True,
+                )
+                if rc.get("example"):
+                    st.caption(
+                        f"📝 Context: {rc['example'].replace(rc['word'], '____')}"
                     )
-                    st.markdown(
-                        f"<h3 style='text-align:center'>💡 {rc['meaning_zh']}</h3>",
-                        unsafe_allow_html=True,
-                    )
-                    if rc.get("example"):
-                        st.caption(
-                            f"📝 Context: {rc['example'].replace(rc['word'], '____')}"
-                        )
-                else:
-                    # 反面：英文單字 + 其他資訊
-                    st.markdown(
-                        f"<h1 style='text-align:center;font-size:3rem;color:#00cec9'>{rc['word']}</h1>",
-                        unsafe_allow_html=True,
-                    )
-                    if rc.get("meaning_en"):
-                        st.markdown(f"**📖 英文定義：** {rc['meaning_en']}")
-                    if rc.get("example"):
-                        st.markdown(f"**📝 例句：** {rc['example']}")
-                    if rc.get("collocations"):
-                        st.markdown(f"**🎯 慣用搭配：** {rc['collocations']}")
-                    if st.button(f"🔊 播放發音", key=f"rev_pron_{rc.get('id', 'x')}"):
-                        play_pronunciation(rc["word"])
+            else:
+                st.markdown(
+                    f"<h1 style='text-align:center;font-size:3rem;color:#00cec9'>{rc['word']}</h1>",
+                    unsafe_allow_html=True,
+                )
+                if rc.get("meaning_en"):
+                    st.markdown(f"**📖 英文定義：** {rc['meaning_en']}")
+                if rc.get("example"):
+                    st.markdown(f"**📝 例句：** {rc['example']}")
+                if rc.get("collocations"):
+                    st.markdown(f"**🎯 慣用搭配：** {rc['collocations']}")
+                if st.button("🔊 播放發音", key=f"rev_pron_{rc.get('id', 'x')}"):
+                    play_pronunciation(rc["word"])
 
-            rb1, rb2, rb3 = st.columns([1, 2, 1])
-            with rb1:
-                if st.button("⬅️ 上一字", key="rev_prev") and rev_idx > 0:
-                    st.session_state.pulse_review_idx -= 1
+        rb1, rb2, rb3 = st.columns([1, 2, 1])
+        with rb1:
+            if st.button("⬅️ 上一字", key="rev_prev") and rev_idx > 0:
+                st.session_state.pulse_review_idx -= 1
+                st.session_state.pulse_review_flipped = False
+                st.rerun()
+        with rb2:
+            if st.button(
+                "🔄 翻到反面" if not rev_flipped else "🔄 翻回正面", key="rev_flip"
+            ):
+                st.session_state.pulse_review_flipped = not rev_flipped
+                st.rerun()
+        with rb3:
+            next_label = "下一字 ➡️" if rev_idx < len(wrong_list) - 1 else "✅ 複習完畢"
+            if st.button(next_label, key="rev_next"):
+                if rev_idx < len(wrong_list) - 1:
+                    st.session_state.pulse_review_idx += 1
                     st.session_state.pulse_review_flipped = False
                     st.rerun()
-            with rb2:
-                if st.button(
-                    "🔄 翻到反面" if not rev_flipped else "🔄 翻回正面", key="rev_flip"
-                ):
-                    st.session_state.pulse_review_flipped = not rev_flipped
-                    st.rerun()
-            with rb3:
-                next_label = (
-                    "下一字 ➡️" if rev_idx < len(wrong_list) - 1 else "✅ 複習完畢"
-                )
-                if st.button(next_label, key="rev_next"):
-                    if rev_idx < len(wrong_list) - 1:
-                        st.session_state.pulse_review_idx += 1
-                        st.session_state.pulse_review_flipped = False
-                        st.rerun()
-                    else:
-                        # 複習完畢 → 重新測驗
-                        shuffled = list(due)
-                        random.shuffle(shuffled)
-                        st.session_state.pulse_session_words = shuffled
-                        st.session_state.pulse_session_idx = 0
-                        st.session_state.pulse_wrong_words = []
-                        st.session_state.pulse_session_done = False
-                        st.session_state.pulse_review_mode = False
-                        st.session_state.pulse_review_flipped = False
-                        st.session_state.hint_level = 0
-                        st.rerun()
-            st.stop()
-
-        # ── 測驗結束畫面 ─────────────────────────────────────
-        if st.session_state.get("pulse_session_done", False):
-            wrong_list = st.session_state.get("pulse_wrong_words", [])
-            total = len(session_words)
-            correct_count = total - len(wrong_list)
-
-            inject_sound("completion")
-            st.balloons()
-            st.markdown(
-                f"""
-            <div style="background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);
-                border:2px solid #00cec9;border-radius:24px;padding:2.5rem 2rem;
-                text-align:center;box-shadow:0 0 60px rgba(0,206,201,0.4);margin-bottom:1.5rem;">
-                <div style="font-size:4rem">{"🏆" if not wrong_list else "📝"}</div>
-                <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;color:#00cec9;margin:0.5rem 0">測驗完成！</div>
-                <div style="font-size:2rem;font-weight:800;color:#55efc4">{correct_count} / {total} 答對</div>
-                <div style="color:#8b949e;margin-top:0.5rem">{"全部答對，超厲害！🎉" if not wrong_list else f"有 {len(wrong_list)} 個單字需要加強複習"}</div>
-            </div>""",
-                unsafe_allow_html=True,
-            )
-
-            if wrong_list:
-                st.markdown("### ❌ 答錯的單字")
-                for w in wrong_list:
-                    st.markdown(
-                        f"""
-                    <div class="wrong-card">
-                        <b style="color:#ff7675">{w["word"]}</b>
-                        <span style="color:#8b949e;margin-left:1rem">{w.get("meaning_zh", "")}</span>
-                        {"<br><small style='color:#636e72'>📝 " + w.get("example", "") + "</small>" if w.get("example") else ""}
-                    </div>""",
-                        unsafe_allow_html=True,
-                    )
-
-                st.write("")
-                dc1, dc2 = st.columns(2)
-                with dc1:
-                    if st.button("🎴 翻卡複習答錯單字", use_container_width=True):
-                        st.session_state.pulse_review_mode = True
-                        st.session_state.pulse_review_idx = 0
-                        st.session_state.pulse_review_flipped = False
-                        st.rerun()
-                with dc2:
-                    if st.button("🔄 重新測驗全部", use_container_width=True):
-                        shuffled = list(due)
-                        random.shuffle(shuffled)
-                        st.session_state.pulse_session_words = shuffled
-                        st.session_state.pulse_session_idx = 0
-                        st.session_state.pulse_wrong_words = []
-                        st.session_state.pulse_session_done = False
-                        st.session_state.hint_level = 0
-                        st.rerun()
-            else:
-                if st.button("🔄 再來一輪", use_container_width=True):
-                    shuffled = list(due)
-                    random.shuffle(shuffled)
-                    st.session_state.pulse_session_words = shuffled
-                    st.session_state.pulse_session_idx = 0
-                    st.session_state.pulse_wrong_words = []
-                    st.session_state.pulse_session_done = False
-                    st.session_state.hint_level = 0
-                    st.rerun()
-            st.stop()
-
-        # ── 正在作答 ─────────────────────────────────────────
-        idx = st.session_state.pulse_session_idx
-        if idx >= len(session_words):
-            st.session_state.pulse_session_done = True
-            st.rerun()
-
-        q = session_words[idx]
-        hint_level = st.session_state.get("hint_level", 0)
-        total = len(session_words)
-        wrong_so_far = len(st.session_state.get("pulse_wrong_words", []))
-
-        st.markdown(f"**進度：{idx + 1} / {total}　｜　已答錯：{wrong_so_far} 個**")
-        st.progress((idx + 1) / total)
-
-        # 放棄鍵
-        abandon_col, _ = st.columns([1, 3])
-        with abandon_col:
-            if st.button("🏳️ 放棄測驗", use_container_width=True):
-                st.session_state.pulse_session_done = True
-                st.rerun()
-
-        with st.container(border=True):
-            cat_display = q.get("category") or "預設"
-            st.markdown(
-                f"<span class='cat-badge'>📂 {cat_display}</span>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(f"### 💡 中文提示：**{q['meaning_zh']}**")
-            if q.get("example"):
-                st.caption(f"📝 Context: {q['example'].replace(q['word'], '____')}")
-            if hint_level == 1:
-                st.markdown(
-                    f"<div class='hint-badge'>💡 字首提示：{q['word'][0].upper()}...</div>",
-                    unsafe_allow_html=True,
-                )
-                play_pronunciation(q["word"])
-            elif hint_level == 2:
-                st.markdown(
-                    f"<div class='hint-badge'>📖 英文定義：{q.get('meaning_en', '（無英文定義）')}</div>",
-                    unsafe_allow_html=True,
-                )
-            st.caption(
-                f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
-            )
-
-        with st.form("pulse_form_session", clear_on_submit=True):
-            ans = st.text_input(
-                "Type the correct Entry（不分大小寫）:",
-                key="pulse_input_s",
-                placeholder="輸入答案後按 Enter 送出",
-            )
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                submitted = st.form_submit_button(
-                    "EXECUTE VERIFICATION", use_container_width=True
-                )
-            with col2:
-                play_btn = st.form_submit_button("🔊 發音", use_container_width=True)
-            with col3:
-                skip_btn = st.form_submit_button(
-                    "⏭️ 跳過（計錯）", use_container_width=True
-                )
-
-        if submitted and ans.strip():
-            if ans.strip().lower() == q["word"].lower():
-                st.success("✅ Correct!")
-                inject_sound("success")
-                new_m = min(5, q["mastery"] + 1)
-                update_mastery_in_db(q["id"], new_m, access_token)
-                st.session_state.pulse_session_idx += 1
-                st.session_state.hint_level = 0
-                if st.session_state.pulse_session_idx >= total:
-                    st.session_state.pulse_session_done = True
-                st.rerun()
-            else:
-                if hint_level < 2:
-                    st.session_state.hint_level += 1
-                    st.warning(f"❌ 答錯！給你提示 {st.session_state.hint_level}/2")
-                    st.rerun()
                 else:
-                    current_m = q.get("mastery", 1)
-                    new_m = calculate_new_mastery(current_m)
-                    update_mastery_in_db(q["id"], new_m, access_token)
-                    st.error(
-                        f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
-                    )
-                    wrong_list = st.session_state.get("pulse_wrong_words", [])
-                    wrong_list.append(q)
-                    st.session_state.pulse_wrong_words = wrong_list
-                    st.session_state.pulse_session_idx += 1
-                    st.session_state.hint_level = 0
-                    if st.session_state.pulse_session_idx >= total:
-                        st.session_state.pulse_session_done = True
+                    init_session()
+                    st.rerun()
+        st.stop()
+
+    # ══════════════════════════════════════════════════════════
+    # 測驗結束畫面
+    # ══════════════════════════════════════════════════════════
+    if st.session_state.get("pulse_session_done", False):
+        wrong_list = st.session_state.get("pulse_wrong_words", [])
+        total = len(session_words)
+        correct_count = total - len(wrong_list)
+
+        inject_sound("completion")
+        st.balloons()
+        st.markdown(
+            f"""
+        <div style="background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);
+            border:2px solid #00cec9;border-radius:24px;padding:2.5rem 2rem;
+            text-align:center;box-shadow:0 0 60px rgba(0,206,201,0.4);margin-bottom:1.5rem;">
+            <div style="font-size:4rem">{"🏆" if not wrong_list else "📝"}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:800;color:#00cec9;margin:0.5rem 0">測驗完成！</div>
+            <div style="font-size:2rem;font-weight:800;color:#55efc4">{correct_count} / {total} 答對</div>
+            <div style="color:#8b949e;margin-top:0.5rem">{"全部答對，超厲害！🎉" if not wrong_list else f"有 {len(wrong_list)} 個單字需要加強複習"}</div>
+        </div>""",
+            unsafe_allow_html=True,
+        )
+
+        if wrong_list:
+            st.markdown("### ❌ 答錯的單字")
+            for w in wrong_list:
+                st.markdown(
+                    f"""
+                <div class="wrong-card">
+                    <b style="color:#ff7675">{w["word"]}</b>
+                    <span style="color:#8b949e;margin-left:1rem">{w.get("meaning_zh", "")}</span>
+                    {"<br><small style='color:#636e72'>📝 " + w.get("example", "") + "</small>" if w.get("example") else ""}
+                </div>""",
+                    unsafe_allow_html=True,
+                )
+
+            st.write("")
+            st.markdown("### 📚 繼續強化這些單字")
+            dc1, dc2, dc3 = st.columns(3)
+            with dc1:
+                if st.button("🎴 翻卡複習", use_container_width=True):
+                    st.session_state.pulse_review_mode = True
+                    st.session_state.pulse_review_idx = 0
+                    st.session_state.pulse_review_flipped = False
+                    st.rerun()
+            with dc2:
+                if st.button("🎮 連連看", use_container_width=True):
+                    st.session_state.pulse_match_mode = True
+                    st.session_state.match_reset = True
+                    st.rerun()
+            with dc3:
+                if st.button("🤖 AI 記憶輔助", use_container_width=True):
+                    st.session_state.pulse_ai_mode = True
+                    st.session_state.pulse_ai_response = ""
                     st.rerun()
 
-        if play_btn:
-            play_pronunciation(q["word"])
-        if skip_btn:
+            st.write("")
+            if st.button("🔄 重新測驗全部", use_container_width=True):
+                init_session()
+                st.rerun()
+        else:
+            if st.button("🔄 再來一輪", use_container_width=True):
+                init_session()
+                st.rerun()
+        st.stop()
+
+    # ══════════════════════════════════════════════════════════
+    # 正在作答
+    # ══════════════════════════════════════════════════════════
+    idx = st.session_state.pulse_session_idx
+    if idx >= len(session_words):
+        st.session_state.pulse_session_done = True
+        st.rerun()
+
+    q = session_words[idx]
+    hint_level = st.session_state.get("hint_level", 0)
+    total = len(session_words)
+    wrong_so_far = len(st.session_state.get("pulse_wrong_words", []))
+
+    st.markdown(f"**進度：{idx + 1} / {total}　｜　已答錯：{wrong_so_far} 個**")
+    st.progress((idx + 1) / total)
+
+    # 放棄鍵（顯眼位置）
+    abandon_col, _ = st.columns([1, 3])
+    with abandon_col:
+        if st.button("🏳️ 放棄（拼不出來）", use_container_width=True):
+            current_m = q.get("mastery", 1)
+            new_m = calculate_new_mastery(current_m)
+            update_mastery_in_db(q["id"], new_m, access_token)
             wrong_list = st.session_state.get("pulse_wrong_words", [])
             wrong_list.append(q)
             st.session_state.pulse_wrong_words = wrong_list
@@ -1388,17 +1498,88 @@ elif "Flash Pulse" in choice:
                 st.session_state.pulse_session_done = True
             st.rerun()
 
-        st.markdown("---")
-        hint_status = {
-            0: "🟢 無提示",
-            1: "🟡 字首已顯示",
-            2: "🔴 英文定義已顯示（再答不出將降級）",
-        }
-        st.caption(f"提示狀態：{hint_status[hint_level]}")
+    with st.container(border=True):
+        cat_display = q.get("category") or "預設"
+        st.markdown(
+            f"<span class='cat-badge'>📂 {cat_display}</span>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"### 💡 中文提示：**{q['meaning_zh']}**")
+        if q.get("example"):
+            st.caption(f"📝 Context: {q['example'].replace(q['word'], '____')}")
+        if hint_level == 1:
+            st.markdown(
+                f"<div class='hint-badge'>💡 字首提示：{q['word'][0].upper()}...</div>",
+                unsafe_allow_html=True,
+            )
+            play_pronunciation(q["word"])
+        elif hint_level == 2:
+            st.markdown(
+                f"<div class='hint-badge'>📖 英文定義：{q.get('meaning_en', '（無英文定義）')}</div>",
+                unsafe_allow_html=True,
+            )
+        st.caption(
+            f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
+        )
+
+    with st.form("pulse_form_session", clear_on_submit=True):
+        ans = st.text_input(
+            "Type the correct Entry（不分大小寫）:",
+            key="pulse_input_s",
+            placeholder="輸入答案後按 Enter 送出",
+        )
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            submitted = st.form_submit_button(
+                "EXECUTE VERIFICATION", use_container_width=True
+            )
+        with col2:
+            play_btn = st.form_submit_button("🔊 發音", use_container_width=True)
+
+    if submitted and ans.strip():
+        if ans.strip().lower() == q["word"].lower():
+            st.success("✅ Correct!")
+            inject_sound("success")
+            new_m = min(5, q["mastery"] + 1)
+            update_mastery_in_db(q["id"], new_m, access_token)
+            st.session_state.pulse_session_idx += 1
+            st.session_state.hint_level = 0
+            if st.session_state.pulse_session_idx >= total:
+                st.session_state.pulse_session_done = True
+            st.rerun()
+        else:
+            if hint_level < 2:
+                st.session_state.hint_level += 1
+                st.warning(f"❌ 答錯！給你提示 {st.session_state.hint_level}/2")
+                st.rerun()
+            else:
+                current_m = q.get("mastery", 1)
+                new_m = calculate_new_mastery(current_m)
+                update_mastery_in_db(q["id"], new_m, access_token)
+                st.error(f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}")
+                wrong_list = st.session_state.get("pulse_wrong_words", [])
+                wrong_list.append(q)
+                st.session_state.pulse_wrong_words = wrong_list
+                st.session_state.pulse_session_idx += 1
+                st.session_state.hint_level = 0
+                if st.session_state.pulse_session_idx >= total:
+                    st.session_state.pulse_session_done = True
+                st.rerun()
+
+    if play_btn:
+        play_pronunciation(q["word"])
+
+    st.markdown("---")
+    hint_status = {
+        0: "🟢 無提示",
+        1: "🟡 字首已顯示",
+        2: "🔴 英文定義已顯示（再答不出將降級）",
+    }
+    st.caption(f"提示狀態：{hint_status[hint_level]}")
 
 
 # ============================================================
-# 11. 頁面：Ebbing Log
+# 11. 頁面：Ebbing Log（移除單字列表，保留圖表統計）
 # ============================================================
 elif "Ebbing Log" in choice:
     st.markdown("<div class='main-title'>Ebbing Log</div>", unsafe_allow_html=True)
@@ -1411,13 +1592,6 @@ elif "Ebbing Log" in choice:
             df[df["category"] == ebbing_cat].copy()
             if ebbing_cat != "全部"
             else df.copy()
-        )
-
-        selected_level = st.radio(
-            "篩選 Level：",
-            ["全部", 0, 1, 2, 3, 4, 5],
-            horizontal=True,
-            key="ebbing_level_filter",
         )
 
         level_counts = df_filtered.groupby("mastery").size().reset_index()
@@ -1492,62 +1666,25 @@ elif "Ebbing Log" in choice:
 
         st.write("")
         st.divider()
-        col_left, col_right = st.columns([3, 2])
 
-        with col_left:
-            show_df = (
-                df_filtered
-                if selected_level == "全部"
-                else df_filtered[df_filtered["mastery"] == int(selected_level)]
+        # 只保留最近待複習（移除單字列表）
+        st.markdown("**⏰ 最近待複習（前 10 筆）**")
+        upcoming = df_filtered.sort_values("next_review").head(10)
+        for _, row in upcoming.iterrows():
+            days_until = (pd.to_datetime(row["next_review"]).date() - date.today()).days
+            badge = (
+                f"🔴 過期{abs(days_until)}天"
+                if days_until < 0
+                else ("🟡 今日" if days_until == 0 else f"🟢 {days_until}天後")
             )
-            label_text = f"{'全部' if ebbing_cat == '全部' else ebbing_cat}｜{'全部 Level' if selected_level == '全部' else f'L{selected_level}'}"
-            st.markdown(f"**📋 {label_text}（{len(show_df)} 個）**")
-            if not show_df.empty:
-                display_cols = [
-                    "word",
-                    "meaning_zh",
-                    "category",
-                    "mastery",
-                    "next_review",
-                ]
-                existing = [c for c in display_cols if c in show_df.columns]
-                st.dataframe(
-                    show_df[existing].rename(
-                        columns={
-                            "word": "單字",
-                            "meaning_zh": "中文定義",
-                            "category": "類別",
-                            "mastery": "Level",
-                            "next_review": "下次複習",
-                        }
-                    ),
-                    use_container_width=True,
-                    hide_index=True,
-                    height=350,
-                )
-            else:
-                st.info("此條件目前沒有單字。")
-
-        with col_right:
-            st.markdown("**⏰ 最近待複習（前 10 筆）**")
-            upcoming = df_filtered.sort_values("next_review").head(10)
-            for _, row in upcoming.iterrows():
-                days_until = (
-                    pd.to_datetime(row["next_review"]).date() - date.today()
-                ).days
-                badge = (
-                    f"🔴 過期{abs(days_until)}天"
-                    if days_until < 0
-                    else ("🟡 今日" if days_until == 0 else f"🟢 {days_until}天後")
-                )
-                cat_tag = row.get("category") or "預設"
-                st.markdown(
-                    f"<div style='padding:0.4rem 0.6rem;margin-bottom:0.4rem;"
-                    f"background:rgba(255,255,255,0.05);border-radius:8px;font-size:0.88rem'>"
-                    f"<b>{row['word']}</b> {badge} <span class='cat-badge'>{cat_tag}</span><br>"
-                    f"<span style='color:#8b949e'>{row['meaning_zh']} ｜ L{row['mastery']}</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+            cat_tag = row.get("category") or "預設"
+            st.markdown(
+                f"<div style='padding:0.4rem 0.6rem;margin-bottom:0.4rem;"
+                f"background:rgba(255,255,255,0.05);border-radius:8px;font-size:0.88rem'>"
+                f"<b>{row['word']}</b> {badge} <span class='cat-badge'>{cat_tag}</span><br>"
+                f"<span style='color:#8b949e'>{row['meaning_zh']} ｜ L{row['mastery']}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
     else:
         st.info("Insufficient data for log prediction.")
