@@ -73,8 +73,6 @@ st.markdown(
             border-radius: 12px; padding: 0.6rem 1rem; margin-bottom: 0.5rem;
             font-size: 0.92rem;
         }
-
-        /* 連連看樣式 */
         .match-btn-left {
             background: rgba(0,206,201,0.1) !important;
             border: 1px solid rgba(0,206,201,0.4) !important;
@@ -108,8 +106,6 @@ st.markdown(
             25% { transform: translateX(-5px); }
             75% { transform: translateX(5px); }
         }
-
-        /* AI 對話氣泡 */
         .ai-bubble {
             background: linear-gradient(135deg, rgba(0,206,201,0.08), rgba(9,132,227,0.08));
             border: 1px solid rgba(0,206,201,0.3);
@@ -256,10 +252,6 @@ def play_pronunciation(word: str):
 
 
 def inject_sound(sound_type: str):
-    """
-    sound_type: 'success' | 'completion'
-    Uses st.components.v1.html so JS actually executes (not rendered as raw text).
-    """
     import streamlit.components.v1 as components
 
     if sound_type == "success":
@@ -316,7 +308,6 @@ def inject_sound(sound_type: str):
 # AI 輔助學習函式
 # ============================================================
 def get_ai_help(words_list: list, api_key: str) -> str:
-    """Call Anthropic API to get AI-assisted learning content for wrong words."""
     if not api_key:
         return "（未設定 Anthropic API Key，無法使用 AI 輔助）"
 
@@ -359,6 +350,25 @@ def get_ai_help(words_list: list, api_key: str) -> str:
         return f"API 錯誤：{data.get('error', {}).get('message', '未知錯誤')}"
     except Exception as e:
         return f"連線錯誤：{str(e)}"
+
+
+def build_prompt(
+    word: str, meaning_zh: str, meaning_en: str = "", example: str = ""
+) -> str:
+    lines = [
+        f"我正在學習英文單字「{word}」（中文：{meaning_zh}）。",
+        "請用繁體中文幫我：",
+        "1. 解釋這個字的核心含義與使用場景",
+        "2. 提供一個好記的記憶技巧（字根、聯想、故事或諧音皆可）",
+        "3. 給出 2 個生動的例句（附中文翻譯）",
+        "4. 列出 2-3 個常用搭配詞（collocations）",
+        "5. 提醒我這個字容易和哪些字混淆",
+    ]
+    if meaning_en:
+        lines.insert(1, f"英文定義：{meaning_en}")
+    if example:
+        lines.insert(2, f"例句參考：{example}")
+    return "\n".join(lines)
 
 
 # ============================================================
@@ -981,7 +991,6 @@ elif "Matrix Cards" in choice:
             </div>""",
                 unsafe_allow_html=True,
             )
-
             btn_col1, btn_col2 = st.columns(2)
             with btn_col1:
                 if st.button("🔄 再來一次", use_container_width=True):
@@ -996,7 +1005,6 @@ elif "Matrix Cards" in choice:
                     st.rerun()
             st.stop()
 
-        # 確保 card_index 在合法範圍
         st.session_state.card_index = max(
             0, min(st.session_state.card_index, len(due_cards) - 1)
         )
@@ -1066,7 +1074,7 @@ elif "Matrix Cards" in choice:
 
 
 # ============================================================
-# 10. 頁面：Flash Pulse（單一測驗模式）
+# 10. 頁面：Flash Pulse
 # ============================================================
 elif "Flash Pulse" in choice:
     st.markdown("<div class='main-title'>Flash Pulse</div>", unsafe_allow_html=True)
@@ -1092,7 +1100,6 @@ elif "Flash Pulse" in choice:
         st.success(msg)
         st.stop()
 
-    # ── 初始化 session state ──────────────────────────────────
     def init_session():
         shuffled = list(due)
         random.shuffle(shuffled)
@@ -1107,11 +1114,11 @@ elif "Flash Pulse" in choice:
         st.session_state.pulse_ai_mode = False
         st.session_state.pulse_match_mode = False
         st.session_state.pulse_ai_response = ""
+        st.session_state.prompt_expanded = {}  # ← 重置提示詞展開狀態
 
     if "pulse_session_words" not in st.session_state:
         init_session()
 
-    # 重新開始按鈕
     if st.button("🔄 重新開始測驗（今日到期單字）", use_container_width=True):
         init_session()
         st.rerun()
@@ -1135,7 +1142,6 @@ elif "Flash Pulse" in choice:
         st.markdown("### 🎮 連連看：英文配中文")
         st.caption("點選左欄的英文單字，再點右欄對應的中文定義")
 
-        # 初始化連連看狀態
         if "match_pairs" not in st.session_state or st.session_state.get(
             "match_reset", False
         ):
@@ -1201,7 +1207,6 @@ elif "Flash Pulse" in choice:
         with col_right:
             st.markdown("**🇹🇼 中文定義**")
             for meaning in right_items:
-                # 找到這個中文對應的英文
                 matched_word = next(
                     (w for w, m in pairs.items() if m == meaning and w in matched), None
                 )
@@ -1410,72 +1415,92 @@ elif "Flash Pulse" in choice:
             unsafe_allow_html=True,
         )
 
-        # ── Session state 管理展開狀態 ──────────────────────────────
-if "prompt_expanded" not in st.session_state:
-    st.session_state.prompt_expanded = {}  # { word_id: bool }
+        # ── 錯題列表（含 BYOAI 複製提示詞）──────────────────────────
+        if wrong_list:
+            # 確保 prompt_expanded 狀態存在
+            if "prompt_expanded" not in st.session_state:
+                st.session_state.prompt_expanded = {}
 
+            st.markdown("### ❌ 答錯的單字")
 
-def build_prompt(
-    word: str, meaning_zh: str, meaning_en: str = "", example: str = ""
-) -> str:
-    """動態生成萬用 AI 提示詞模板"""
-    lines = [
-        "我正在學習英文單字「{word}」（中文：{meaning_zh}）。",
-        "請用繁體中文幫我：",
-        "1. 解釋這個字的核心含義與使用場景",
-        "2. 提供一個好記的記憶技巧（字根、聯想、故事或諧音皆可）",
-        "3. 給出 2 個生動的例句（附中文翻譯）",
-        "4. 列出 2-3 個常用搭配詞（collocations）",
-        "5. 提醒我這個字容易和哪些字混淆",
-    ]
-    if meaning_en:
-        lines.insert(1, f"英文定義：{meaning_en}")
-    if example:
-        lines.insert(2, f"例句參考：{example}")
-    return "\n".join(lines)
+            for w in wrong_list:
+                word_id = str(w.get("id", w["word"]))
+                pos_list = w.get("pos", [])
+                pos_str = (
+                    "　".join(pos_list)
+                    if isinstance(pos_list, list) and pos_list
+                    else ""
+                )
+                is_expanded = st.session_state.prompt_expanded.get(word_id, False)
 
+                col_info, col_btn = st.columns([5, 2])
+                with col_info:
+                    example_html = ""
+                    if w.get("example"):
+                        example_html = f"<br><small style='color:#636e72'>📝 {w['example'].replace(w['word'], '____')}</small>"
+                    pos_html = ""
+                    if pos_str:
+                        pos_html = f"<span style='color:#74b9ff;font-size:0.8rem;margin-left:0.6rem'>{pos_str}</span>"
+                    st.markdown(
+                        f"""<div class="wrong-card">
+                            <b style="color:#ff7675;font-size:1.05rem">{w["word"]}</b>
+                            {pos_html}
+                            <span style="color:#8b949e;margin-left:0.8rem">{w.get("meaning_zh", "")}</span>
+                            {example_html}
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                with col_btn:
+                    btn_label = (
+                        "✅ 已展開提示詞" if is_expanded else "📋 複製 AI 提示詞"
+                    )
+                    if st.button(
+                        btn_label, key=f"prompt_btn_{word_id}", use_container_width=True
+                    ):
+                        st.session_state.prompt_expanded[word_id] = not is_expanded
+                        st.rerun()
 
-# ── 錯題列表區塊（取代原本的 wrong_list 顯示） ──────────────
-if wrong_list:
-    st.markdown("### ❌ 答錯的單字")
+                if is_expanded:
+                    prompt_text = build_prompt(
+                        word=w["word"],
+                        meaning_zh=w.get("meaning_zh", ""),
+                        meaning_en=w.get("meaning_en", ""),
+                        example=w.get("example", ""),
+                    )
+                    st.code(prompt_text, language=None)
+                    st.caption(
+                        "👆 點選右上角複製圖示，貼到 ChatGPT / Gemini / Claude 即可學習"
+                    )
 
-    for w in wrong_list:
-        word_id = str(w.get("id", w["word"]))
-        pos_list = w.get("pos", [])
-        pos_str = "　".join(pos_list) if isinstance(pos_list, list) and pos_list else ""
-        is_expanded = st.session_state.prompt_expanded.get(word_id, False)
+            st.write("")
+            st.markdown("### 📚 繼續強化這些單字")
+            dc1, dc2, dc3 = st.columns(3)
+            with dc1:
+                if st.button("🎴 翻卡複習", use_container_width=True):
+                    st.session_state.pulse_review_mode = True
+                    st.session_state.pulse_review_idx = 0
+                    st.session_state.pulse_review_flipped = False
+                    st.rerun()
+            with dc2:
+                if st.button("🎮 連連看", use_container_width=True):
+                    st.session_state.pulse_match_mode = True
+                    st.session_state.match_reset = True
+                    st.rerun()
+            with dc3:
+                if st.button("🤖 AI 記憶輔助", use_container_width=True):
+                    st.session_state.pulse_ai_mode = True
+                    st.session_state.pulse_ai_response = ""
+                    st.rerun()
 
-        # 卡片主體
-        col_info, col_btn = st.columns([5, 2])
-        with col_info:
-            st.markdown(
-                f"""<div class="wrong-card">
-                    <b style="color:#ff7675;font-size:1.05rem">{w["word"]}</b>
-                    {"<span style='color:#74b9ff;font-size:0.8rem;margin-left:0.6rem'>" + pos_str + "</span>" if pos_str else ""}
-                    <span style="color:#8b949e;margin-left:0.8rem">{w.get("meaning_zh", "")}</span>
-                    {"<br><small style='color:#636e72'>📝 " + w.get("example", "").replace(w["word"], "____") + "</small>" if w.get("example") else ""}
-                </div>""",
-                unsafe_allow_html=True,
-            )
-        with col_btn:
-            btn_label = "✅ 已複製提示詞" if is_expanded else "📋 複製 AI 提示詞"
-            if st.button(
-                btn_label, key=f"prompt_btn_{word_id}", use_container_width=True
-            ):
-                # 切換展開狀態
-                st.session_state.prompt_expanded[word_id] = not is_expanded
+            st.write("")
+            if st.button("🔄 重新測驗全部", use_container_width=True):
+                init_session()
                 st.rerun()
-
-        # 展開的提示詞區塊
-        if is_expanded:
-            prompt_text = build_prompt(
-                word=w["word"],
-                meaning_zh=w.get("meaning_zh", ""),
-                meaning_en=w.get("meaning_en", ""),
-                example=w.get("example", ""),
-            )
-            st.code(prompt_text, language=None)
-            st.caption("👆 點選右上角複製圖示，貼到 ChatGPT / Gemini / Claude 即可學習")
+        else:
+            if st.button("🔄 再來一輪", use_container_width=True):
+                init_session()
+                st.rerun()
+        st.stop()
 
     # ══════════════════════════════════════════════════════════
     # 正在作答
@@ -1493,7 +1518,6 @@ if wrong_list:
     st.markdown(f"**進度：{idx + 1} / {total}　｜　已答錯：{wrong_so_far} 個**")
     st.progress((idx + 1) / total)
 
-    # 放棄鍵（顯眼位置）
     abandon_col, _ = st.columns([1, 3])
     with abandon_col:
         if st.button("🏳️ 放棄（拼不出來）", use_container_width=True):
@@ -1590,7 +1614,7 @@ if wrong_list:
 
 
 # ============================================================
-# 11. 頁面：Ebbing Log（移除單字列表，保留圖表統計）
+# 11. 頁面：Ebbing Log
 # ============================================================
 elif "Ebbing Log" in choice:
     st.markdown("<div class='main-title'>Ebbing Log</div>", unsafe_allow_html=True)
@@ -1678,7 +1702,6 @@ elif "Ebbing Log" in choice:
         st.write("")
         st.divider()
 
-        # 只保留最近待複習（移除單字列表）
         st.markdown("**⏰ 最近待複習（前 10 筆）**")
         upcoming = df_filtered.sort_values("next_review").head(10)
         for _, row in upcoming.iterrows():
