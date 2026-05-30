@@ -310,41 +310,52 @@ def inject_sound(sound_type: str):
 def inject_victory_effect():
     import streamlit.components.v1 as components
 
-    html_code = """<!DOCTYPE html>
-<html><body style="margin:0;overflow:hidden;background:transparent">
-<canvas id="c" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999"></canvas>
+    # 音效：勝利號角（鋸齒波六音上升），height=0 只跑 JS 音效
+    sound_html = """<!DOCTYPE html><html><body>
 <script>
 (function(){
-  // ── 勝利號角音效（鋸齒波六音上升）──────────────────────
   try {
     var AudioCtx = window.AudioContext || window.webkitAudioContext;
     var actx = new AudioCtx();
-    var trumpet = [
-      {f:392,t:0.00,d:0.18},{f:523,t:0.18,d:0.18},{f:659,t:0.36,d:0.18},
-      {f:784,t:0.54,d:0.30},{f:784,t:0.84,d:0.15},{f:880,t:0.99,d:0.55}
-    ];
-    trumpet.forEach(function(n){
-      var osc  = actx.createOscillator();
-      var gain = actx.createGain();
-      var dist = actx.createWaveShaper();
-      var curve = new Float32Array(256);
-      for(var i=0;i<256;i++) curve[i] = (i<128 ? i/128 : (i-256)/128) * 0.55;
-      dist.curve = curve;
-      osc.connect(dist); dist.connect(gain); gain.connect(actx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.value = n.f;
-      var t = actx.currentTime + n.t + 0.05;
-      gain.gain.setValueAtTime(0.0, t);
-      gain.gain.linearRampToValueAtTime(0.32, t + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + n.d + 0.08);
-      osc.start(t); osc.stop(t + n.d + 0.15);
+    var resume = actx.state === 'suspended' ? actx.resume() : Promise.resolve();
+    resume.then(function(){
+      var trumpet = [
+        {f:392,t:0.00,d:0.20},{f:523,t:0.20,d:0.20},{f:659,t:0.40,d:0.20},
+        {f:784,t:0.60,d:0.30},{f:784,t:0.90,d:0.15},{f:880,t:1.05,d:0.60}
+      ];
+      trumpet.forEach(function(n){
+        var osc  = actx.createOscillator();
+        var gain = actx.createGain();
+        var dist = actx.createWaveShaper();
+        var curve = new Float32Array(256);
+        for(var i=0;i<256;i++) curve[i] = (i<128?i/128:(i-256)/128)*0.5;
+        dist.curve = curve;
+        osc.connect(dist); dist.connect(gain); gain.connect(actx.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.value = n.f;
+        var t = actx.currentTime + n.t + 0.05;
+        gain.gain.setValueAtTime(0.0, t);
+        gain.gain.linearRampToValueAtTime(0.30, t+0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, t+n.d+0.08);
+        osc.start(t); osc.stop(t+n.d+0.15);
+      });
     });
   } catch(e){ console.warn('audio:', e); }
+})();
+</script>
+</body></html>"""
+    components.html(sound_html, height=0, scrolling=False)
 
-  // ── 爆炸粒子動畫 ──────────────────────────────────────
+    # 粒子動畫：放在有高度的 iframe 裡，canvas 填滿 iframe
+    particle_html = """<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+<canvas id="c" style="display:block;width:100%;height:100%;"></canvas>
+<script>
+(function(){
   var canvas = document.getElementById('c');
-  var W = canvas.width  = window.innerWidth;
-  var H = canvas.height = window.innerHeight;
+  var W = canvas.width  = canvas.offsetWidth  || 800;
+  var H = canvas.height = canvas.offsetHeight || 300;
   var cx = canvas.getContext('2d');
 
   var COLORS = ['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#ffffff','#ffeaa7'];
@@ -353,18 +364,18 @@ def inject_victory_effect():
     this.x = x; this.y = y;
     this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
     var angle = Math.random() * Math.PI * 2;
-    var speed = 5 + Math.random() * 12;
+    var speed = 4 + Math.random() * 10;
     this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed - 7;
-    this.size = 5 + Math.random() * 9;
+    this.vy = Math.sin(angle) * speed - 6;
+    this.size = 5 + Math.random() * 8;
     this.shape = Math.random() < 0.5 ? 'rect' : 'circle';
     this.rotation = Math.random() * Math.PI * 2;
-    this.rotSpeed = (Math.random()-0.5) * 0.35;
+    this.rotSpeed = (Math.random()-0.5) * 0.3;
     this.life = 1.0;
-    this.decay = 0.010 + Math.random() * 0.016;
+    this.decay = 0.010 + Math.random() * 0.015;
   }
   Particle.prototype.update = function(){
-    this.vy += 0.28;
+    this.vy += 0.25;
     this.vx *= 0.98;
     this.x += this.vx; this.y += this.vy;
     this.rotation += this.rotSpeed;
@@ -387,19 +398,19 @@ def inject_victory_effect():
   };
 
   var bursts = [
-    {x: W*0.20, y: H*0.30, delay: 0},
-    {x: W*0.50, y: H*0.20, delay: 100},
-    {x: W*0.80, y: H*0.30, delay: 200},
-    {x: W*0.35, y: H*0.50, delay: 320},
-    {x: W*0.65, y: H*0.48, delay: 440},
-    {x: W*0.50, y: H*0.60, delay: 560},
+    {x: W*0.15, y: H*0.4,  delay: 0},
+    {x: W*0.50, y: H*0.2,  delay: 80},
+    {x: W*0.85, y: H*0.4,  delay: 160},
+    {x: W*0.30, y: H*0.7,  delay: 260},
+    {x: W*0.70, y: H*0.65, delay: 360},
+    {x: W*0.50, y: H*0.85, delay: 460},
   ];
 
   var particles = [];
   var frame = 0;
 
   function spawnBurst(bx, by){
-    for(var i=0;i<130;i++) particles.push(new Particle(bx, by));
+    for(var i=0;i<100;i++) particles.push(new Particle(bx, by));
   }
 
   function loop(){
@@ -410,14 +421,14 @@ def inject_victory_effect():
     particles = particles.filter(function(p){ return p.life > 0; });
     particles.forEach(function(p){ p.update(); p.draw(); });
     frame++;
-    if(frame < 500 || particles.length > 0) requestAnimationFrame(loop);
+    if(frame < 550 || particles.length > 0) requestAnimationFrame(loop);
     else cx.clearRect(0,0,W,H);
   }
   loop();
 })();
 </script>
 </body></html>"""
-    components.html(html_code, height=0, scrolling=False)
+    components.html(particle_html, height=300, scrolling=False)
 
 
 # ============================================================
