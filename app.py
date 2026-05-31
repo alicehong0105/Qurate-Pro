@@ -426,9 +426,19 @@ def inject_victory_effect():
     particles.forEach(function(p){{p.update();p.draw();}});
     frame++;
     if(frame<650||particles.length>0) requestAnimationFrame(loop);
-    else{{ cx.clearRect(0,0,W,H); canvas.remove(); }}
+    else{{
+      cx.clearRect(0,0,W,H);
+      try{{ canvas.remove(); }} catch(e){{}}
+      try{{ doc.getElementById('vic_flash_{_id}').remove(); }} catch(e){{}}
+    }}
   }}
   loop();
+
+  /* 8秒後強制清除，避免殘留 */
+  setTimeout(function(){{
+    try{{ canvas.remove(); }} catch(e){{}}
+    try{{ doc.getElementById('vic_flash_{_id}').remove(); }} catch(e){{}}
+  }}, 8000);
 }})();
 </script>
 </body>
@@ -1537,7 +1547,8 @@ elif "Flash Pulse" in choice:
         total = len(session_words)
         correct_count = total - len(wrong_list)
 
-        inject_victory_effect()
+        if correct_count > 0:
+            inject_victory_effect()
 
         st.markdown(
             f"""
