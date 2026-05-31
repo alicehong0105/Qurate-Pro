@@ -307,6 +307,55 @@ def inject_sound(sound_type: str):
 # ============================================================
 # Flash Pulse 專用：勝利號角 + 爆炸粒子特效
 # ============================================================
+def inject_congrats_sound():
+    """播放 Congratulations 音效：上升琶音 + 長尾餘韻"""
+    import streamlit.components.v1 as components
+
+    html = """<!DOCTYPE html><html><body>
+<script>
+(function(){
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC();
+    var go = ctx.state==='suspended' ? ctx.resume() : Promise.resolve();
+    go.then(function(){
+      // 主旋律：歡樂上升琶音
+      var melody = [
+        {f:523.25, t:0.00, d:0.18, vol:0.35},
+        {f:659.25, t:0.16, d:0.18, vol:0.35},
+        {f:783.99, t:0.32, d:0.18, vol:0.35},
+        {f:1046.5, t:0.48, d:0.35, vol:0.40},
+        {f:987.77, t:0.70, d:0.18, vol:0.30},
+        {f:1046.5, t:0.88, d:0.55, vol:0.45},
+      ];
+      // 和聲層
+      var harmony = [
+        {f:261.63, t:0.00, d:0.55, vol:0.15},
+        {f:329.63, t:0.00, d:0.55, vol:0.12},
+        {f:523.25, t:0.48, d:0.85, vol:0.18},
+      ];
+      function playNote(n, type) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = type || 'sine';
+        osc.frequency.value = n.f;
+        var t = ctx.currentTime + n.t + 0.05;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(n.vol, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + n.d + 0.12);
+        osc.start(t); osc.stop(t + n.d + 0.18);
+      }
+      melody.forEach(function(n){ playNote(n, 'sine'); });
+      harmony.forEach(function(n){ playNote(n, 'triangle'); });
+    });
+  } catch(e){ console.warn(e); }
+})();
+</script>
+</body></html>"""
+    components.html(html, height=1, scrolling=False)
+
+
 def inject_victory_effect():
     import streamlit.components.v1 as components
     import random as _rnd
@@ -1258,6 +1307,8 @@ elif "Flash Pulse" in choice:
         st.session_state.pulse_match_mode = False
         st.session_state.pulse_ai_response = ""
         st.session_state.prompt_expanded = {}
+        st.session_state.pulse_victory_shown = False
+        st.session_state.pulse_last_correct = False
 
     if "pulse_session_words" not in st.session_state:
         init_session()
@@ -1547,8 +1598,10 @@ elif "Flash Pulse" in choice:
         total = len(session_words)
         correct_count = total - len(wrong_list)
 
-        if correct_count > 0:
+        if correct_count > 0 and not st.session_state.get("pulse_victory_shown", False):
+            inject_congrats_sound()
             inject_victory_effect()
+            st.session_state.pulse_victory_shown = True
 
         st.markdown(
             f"""
@@ -1651,6 +1704,27 @@ elif "Flash Pulse" in choice:
     # ══════════════════════════════════════════════════════════
     # 正在作答
     # ══════════════════════════════════════════════════════════
+
+    # 最後一題答對後的停留畫面
+    if st.session_state.get("pulse_last_correct", False):
+        inject_sound("success")
+        st.markdown(
+            """
+<div style="text-align:center;padding:2rem 0;">
+  <div style="font-size:5rem">🎉</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:800;color:#55efc4;margin:0.5rem 0">
+    Correct!
+  </div>
+  <div style="color:#8b949e;font-size:1rem">最後一個單字答對了！</div>
+</div>""",
+            unsafe_allow_html=True,
+        )
+        if st.button("🏁 查看測驗結果", use_container_width=True):
+            st.session_state.pulse_last_correct = False
+            st.session_state.pulse_session_done = True
+            st.rerun()
+        st.stop()
+
     idx = st.session_state.pulse_session_idx
     if idx >= len(session_words):
         st.session_state.pulse_session_done = True
@@ -1725,8 +1799,8 @@ elif "Flash Pulse" in choice:
             st.session_state.pulse_session_idx += 1
             st.session_state.hint_level = 0
             if st.session_state.pulse_session_idx >= total:
-                # 最後一題答對：不 rerun，讓同一次渲染直接進結束畫面（特效才不會被沖掉）
-                st.session_state.pulse_session_done = True
+                # 最後一題：顯示答對畫面，等使用者按按鈕才跳到結束
+                st.session_state.pulse_last_correct = True
                 st.rerun()
             else:
                 st.success("✅ Correct!")
