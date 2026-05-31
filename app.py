@@ -308,159 +308,122 @@ def inject_sound(sound_type: str):
 # Flash Pulse 專用：勝利號角 + 爆炸粒子特效
 # ============================================================
 def inject_victory_effect():
-    import streamlit.components.v1 as components
+    """用 st.markdown 直接注入 HTML/JS，不經過 iframe，確保瀏覽器執行"""
+    import random as _rnd
 
-    html_code = """<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+    _id = _rnd.randint(100000, 999999)  # 避免多次呼叫 ID 衝突
 
-<!-- 閃光背景層 -->
-<div id="flash" style="
+    st.markdown(
+        f"""
+<div id="vic_flash_{_id}" style="
     position:fixed;top:0;left:0;width:100vw;height:100vh;
     pointer-events:none;z-index:8888;
-    background:radial-gradient(ellipse at center, rgba(0,206,201,0.35) 0%, rgba(9,132,227,0.2) 40%, transparent 70%);
+    background:radial-gradient(ellipse at center,
+        rgba(0,206,201,0.35) 0%,
+        rgba(9,132,227,0.20) 40%,
+        transparent 70%);
     opacity:0;
-    animation: flashIn 1.8s ease-out forwards;
+    animation:vicFlash_{_id} 2s ease-out forwards;
 "></div>
-
-<!-- 粒子 canvas -->
-<canvas id="c" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;"></canvas>
-
+<canvas id="vic_canvas_{_id}" style="
+    position:fixed;top:0;left:0;width:100vw;height:100vh;
+    pointer-events:none;z-index:9999;
+"></canvas>
 <style>
-@keyframes flashIn {
-    0%   { opacity: 0; }
-    8%   { opacity: 1; }
-    35%  { opacity: 0.6; }
-    100% { opacity: 0; }
-}
+@keyframes vicFlash_{_id} {{
+    0%   {{ opacity:0; }}
+    8%   {{ opacity:1; }}
+    40%  {{ opacity:0.5; }}
+    100% {{ opacity:0; }}
+}}
 </style>
-
 <script>
-(function(){
-  // ── 勝利號角音效 ──────────────────────────────────────────
-  try {
-    var AudioCtx = window.AudioContext || window.webkitAudioContext;
-    var actx = new AudioCtx();
-    var resume = actx.state === 'suspended' ? actx.resume() : Promise.resolve();
-    resume.then(function(){
-      var trumpet = [
-        {f:392,t:0.00,d:0.22},{f:523,t:0.22,d:0.22},{f:659,t:0.44,d:0.22},
-        {f:784,t:0.66,d:0.32},{f:784,t:0.98,d:0.16},{f:880,t:1.14,d:0.65}
-      ];
-      trumpet.forEach(function(n){
-        var osc  = actx.createOscillator();
-        var gain = actx.createGain();
-        var dist = actx.createWaveShaper();
-        var curve = new Float32Array(256);
-        for(var i=0;i<256;i++) curve[i] = (i<128?i/128:(i-256)/128)*0.5;
-        dist.curve = curve;
+(function(){{
+  /* ── 勝利號角 ─────────────────────────────────────── */
+  try {{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var actx = new AC();
+    var go = actx.state==='suspended' ? actx.resume() : Promise.resolve();
+    go.then(function(){{
+      [{{'f':392,'t':0.00,'d':0.22}},{{'f':523,'t':0.22,'d':0.22}},
+       {{'f':659,'t':0.44,'d':0.22}},{{'f':784,'t':0.66,'d':0.32}},
+       {{'f':784,'t':0.98,'d':0.16}},{{'f':880,'t':1.14,'d':0.65}}
+      ].forEach(function(n){{
+        var osc=actx.createOscillator(), gain=actx.createGain(), dist=actx.createWaveShaper();
+        var cv=new Float32Array(256);
+        for(var i=0;i<256;i++) cv[i]=(i<128?i/128:(i-256)/128)*0.5;
+        dist.curve=cv;
         osc.connect(dist); dist.connect(gain); gain.connect(actx.destination);
-        osc.type = 'sawtooth';
-        osc.frequency.value = n.f;
-        var t = actx.currentTime + n.t + 0.05;
-        gain.gain.setValueAtTime(0.0, t);
-        gain.gain.linearRampToValueAtTime(0.30, t+0.04);
-        gain.gain.exponentialRampToValueAtTime(0.001, t+n.d+0.08);
+        osc.type='sawtooth'; osc.frequency.value=n.f;
+        var t=actx.currentTime+n.t+0.05;
+        gain.gain.setValueAtTime(0,t);
+        gain.gain.linearRampToValueAtTime(0.3,t+0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+n.d+0.08);
         osc.start(t); osc.stop(t+n.d+0.15);
-      });
-    });
-  } catch(e){ console.warn('audio:', e); }
+      }});
+    }});
+  }} catch(e){{ console.warn(e); }}
 
-  // ── 爆炸粒子（從四面八方噴射，鋪滿全螢幕）─────────────────
-  var canvas = document.getElementById('c');
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-  var W = canvas.width, H = canvas.height;
-  var cx = canvas.getContext('2d');
+  /* ── 粒子 ────────────────────────────────────────── */
+  var canvas=document.getElementById('vic_canvas_{_id}');
+  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  var W=canvas.width, H=canvas.height, cx=canvas.getContext('2d');
+  var COLORS=['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#fff','#ffeaa7','#6c5ce7'];
 
-  var COLORS = ['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#ffffff','#ffeaa7','#6c5ce7'];
-
-  function Particle(x, y, angleOverride){
-    this.x = x; this.y = y;
-    this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
-    var angle = (angleOverride !== undefined) ? angleOverride : Math.random() * Math.PI * 2;
-    var speed = 6 + Math.random() * 16;
-    this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed;
-    this.size = 5 + Math.random() * 10;
-    this.shape = Math.random() < 0.5 ? 'rect' : 'circle';
-    this.rotation = Math.random() * Math.PI * 2;
-    this.rotSpeed = (Math.random()-0.5) * 0.35;
-    this.life = 1.0;
-    this.decay = 0.008 + Math.random() * 0.012;
-    this.gravity = 0.18 + Math.random() * 0.15;
-  }
-  Particle.prototype.update = function(){
-    this.vy += this.gravity;
-    this.vx *= 0.99;
-    this.x += this.vx; this.y += this.vy;
-    this.rotation += this.rotSpeed;
-    this.life -= this.decay;
-  };
-  Particle.prototype.draw = function(){
-    cx.save();
-    cx.globalAlpha = Math.max(0, this.life);
-    cx.fillStyle = this.color;
-    cx.translate(this.x, this.y);
-    cx.rotate(this.rotation);
-    if(this.shape === 'rect'){
-      cx.fillRect(-this.size/2, -this.size/4, this.size, this.size*0.5);
-    } else {
-      cx.beginPath();
-      cx.arc(0, 0, this.size/2, 0, Math.PI*2);
-      cx.fill();
-    }
+  function P(x,y,a){{
+    this.x=x; this.y=y;
+    this.color=COLORS[Math.floor(Math.random()*COLORS.length)];
+    var spd=6+Math.random()*16;
+    this.vx=Math.cos(a)*spd; this.vy=Math.sin(a)*spd;
+    this.size=5+Math.random()*10;
+    this.shape=Math.random()<0.5?'r':'c';
+    this.rot=Math.random()*Math.PI*2; this.rs=(Math.random()-.5)*.35;
+    this.life=1; this.decay=0.008+Math.random()*0.012;
+    this.g=0.18+Math.random()*.15;
+  }}
+  P.prototype.update=function(){{this.vy+=this.g;this.vx*=.99;this.x+=this.vx;this.y+=this.vy;this.rot+=this.rs;this.life-=this.decay;}};
+  P.prototype.draw=function(){{
+    cx.save();cx.globalAlpha=Math.max(0,this.life);cx.fillStyle=this.color;
+    cx.translate(this.x,this.y);cx.rotate(this.rot);
+    if(this.shape==='r'){{cx.fillRect(-this.size/2,-this.size/4,this.size,this.size*.5);}}
+    else{{cx.beginPath();cx.arc(0,0,this.size/2,0,Math.PI*2);cx.fill();}}
     cx.restore();
-  };
+  }};
 
-  var particles = [];
-  var frame = 0;
-
-  // 爆炸點：中央 + 四個角落 + 四邊中點
-  var bursts = [
-    // 中央大爆炸
-    {x: W*0.50, y: H*0.40, count:180, delay:0,   fromEdge: false},
-    // 四角
-    {x: W*0.05, y: H*0.05, count:100, delay:60,  fromEdge: true, edgeAngle: Math.PI*0.25},
-    {x: W*0.95, y: H*0.05, count:100, delay:80,  fromEdge: true, edgeAngle: Math.PI*0.75},
-    {x: W*0.05, y: H*0.95, count:100, delay:100, fromEdge: true, edgeAngle: -Math.PI*0.25},
-    {x: W*0.95, y: H*0.95, count:100, delay:120, fromEdge: true, edgeAngle: -Math.PI*0.75},
-    // 四邊中點
-    {x: W*0.50, y: H*0.02, count:80,  delay:160, fromEdge: true, edgeAngle: Math.PI*0.5},
-    {x: W*0.50, y: H*0.98, count:80,  delay:180, fromEdge: true, edgeAngle: -Math.PI*0.5},
-    {x: W*0.02, y: H*0.50, count:80,  delay:200, fromEdge: true, edgeAngle: 0},
-    {x: W*0.98, y: H*0.50, count:80,  delay:220, fromEdge: true, edgeAngle: Math.PI},
+  var bursts=[
+    {{x:W*.50,y:H*.40,n:180,d:0,  a:null}},
+    {{x:W*.05,y:H*.05,n:100,d:60, a:Math.PI*.25}},
+    {{x:W*.95,y:H*.05,n:100,d:80, a:Math.PI*.75}},
+    {{x:W*.05,y:H*.95,n:100,d:100,a:-Math.PI*.25}},
+    {{x:W*.95,y:H*.95,n:100,d:120,a:-Math.PI*.75}},
+    {{x:W*.50,y:H*.02,n:80, d:160,a:Math.PI*.5}},
+    {{x:W*.50,y:H*.98,n:80, d:180,a:-Math.PI*.5}},
+    {{x:W*.02,y:H*.50,n:80, d:200,a:0}},
+    {{x:W*.98,y:H*.50,n:80, d:220,a:Math.PI}},
   ];
+  var particles=[],frame=0;
 
-  function spawnBurst(b){
-    for(var i=0; i<b.count; i++){
-      var angle;
-      if(b.fromEdge){
-        // 從邊緣往內扇形噴射
-        angle = b.edgeAngle + (Math.random()-0.5) * Math.PI * 0.9;
-      } else {
-        angle = Math.random() * Math.PI * 2;
-      }
-      particles.push(new Particle(b.x, b.y, angle));
-    }
-  }
-
-  function loop(){
-    cx.clearRect(0, 0, W, H);
-    bursts.forEach(function(b){
-      if(frame === b.delay) spawnBurst(b);
-    });
-    particles = particles.filter(function(p){ return p.life > 0; });
-    particles.forEach(function(p){ p.update(); p.draw(); });
+  function spawn(b){{
+    for(var i=0;i<b.n;i++){{
+      var ang = b.a!==null ? b.a+(Math.random()-.5)*Math.PI*.9 : Math.random()*Math.PI*2;
+      particles.push(new P(b.x,b.y,ang));
+    }}
+  }}
+  function loop(){{
+    cx.clearRect(0,0,W,H);
+    bursts.forEach(function(b){{if(frame===b.d)spawn(b);}});
+    particles=particles.filter(function(p){{return p.life>0;}});
+    particles.forEach(function(p){{p.update();p.draw();}});
     frame++;
-    if(frame < 600 || particles.length > 0) requestAnimationFrame(loop);
+    if(frame<650||particles.length>0) requestAnimationFrame(loop);
     else cx.clearRect(0,0,W,H);
-  }
+  }}
   loop();
-})();
+}})();
 </script>
-</body></html>"""
-    components.html(html_code, height=0, scrolling=False)
+""",
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================================
