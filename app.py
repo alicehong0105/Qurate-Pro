@@ -308,85 +308,95 @@ def inject_sound(sound_type: str):
 # Flash Pulse 專用：勝利號角 + 爆炸粒子特效
 # ============================================================
 def inject_victory_effect():
-    """用 st.markdown 直接注入 HTML/JS，不經過 iframe，確保瀏覽器執行"""
+    import streamlit.components.v1 as components
     import random as _rnd
 
-    _id = _rnd.randint(100000, 999999)  # 避免多次呼叫 ID 衝突
+    _id = _rnd.randint(100000, 999999)
 
-    st.markdown(
-        f"""
-<div id="vic_flash_{_id}" style="
-    position:fixed;top:0;left:0;width:100vw;height:100vh;
-    pointer-events:none;z-index:8888;
-    background:radial-gradient(ellipse at center,
-        rgba(0,206,201,0.35) 0%,
-        rgba(9,132,227,0.20) 40%,
-        transparent 70%);
-    opacity:0;
-    animation:vicFlash_{_id} 2s ease-out forwards;
-"></div>
-<canvas id="vic_canvas_{_id}" style="
-    position:fixed;top:0;left:0;width:100vw;height:100vh;
-    pointer-events:none;z-index:9999;
-"></canvas>
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
 <style>
-@keyframes vicFlash_{_id} {{
-    0%   {{ opacity:0; }}
-    8%   {{ opacity:1; }}
-    40%  {{ opacity:0.5; }}
-    100% {{ opacity:0; }}
-}}
+  html, body {{ margin:0; padding:0; background:transparent; overflow:hidden; }}
 </style>
+</head>
+<body>
 <script>
 (function(){{
-  /* ── 勝利號角 ─────────────────────────────────────── */
+  /* 在父頁面建立 canvas 和閃光層 */
+  var doc = window.parent.document;
+
+  /* 閃光背景 */
+  var flash = doc.createElement('div');
+  flash.id = 'vic_flash_{_id}';
+  flash.style.cssText = [
+    'position:fixed','top:0','left:0','width:100vw','height:100vh',
+    'pointer-events:none','z-index:8888',
+    'background:radial-gradient(ellipse at center,rgba(0,206,201,0.4) 0%,rgba(9,132,227,0.2) 45%,transparent 70%)',
+    'opacity:0','transition:opacity 0.15s'
+  ].join(';');
+  doc.body.appendChild(flash);
+  setTimeout(function(){{ flash.style.opacity='1'; }}, 30);
+  setTimeout(function(){{ flash.style.opacity='0.5'; }}, 300);
+  setTimeout(function(){{ flash.style.opacity='0'; }}, 1800);
+  setTimeout(function(){{ flash.remove(); }}, 2200);
+
+  /* Canvas */
+  var canvas = doc.createElement('canvas');
+  canvas.id = 'vic_canvas_{_id}';
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
+  doc.body.appendChild(canvas);
+  canvas.width  = window.parent.innerWidth;
+  canvas.height = window.parent.innerHeight;
+  var W = canvas.width, H = canvas.height;
+  var cx = canvas.getContext('2d');
+
+  /* 音效：勝利號角 */
   try {{
-    var AC = window.AudioContext || window.webkitAudioContext;
+    var AC = window.parent.AudioContext || window.parent.webkitAudioContext
+          || window.AudioContext || window.webkitAudioContext;
     var actx = new AC();
     var go = actx.state==='suspended' ? actx.resume() : Promise.resolve();
     go.then(function(){{
-      [{{'f':392,'t':0.00,'d':0.22}},{{'f':523,'t':0.22,'d':0.22}},
-       {{'f':659,'t':0.44,'d':0.22}},{{'f':784,'t':0.66,'d':0.32}},
-       {{'f':784,'t':0.98,'d':0.16}},{{'f':880,'t':1.14,'d':0.65}}
-      ].forEach(function(n){{
-        var osc=actx.createOscillator(), gain=actx.createGain(), dist=actx.createWaveShaper();
+      var notes=[
+        {{f:392,t:0.00,d:0.22}},{{f:523,t:0.22,d:0.22}},{{f:659,t:0.44,d:0.22}},
+        {{f:784,t:0.66,d:0.32}},{{f:784,t:0.98,d:0.16}},{{f:880,t:1.14,d:0.65}}
+      ];
+      notes.forEach(function(n){{
+        var osc=actx.createOscillator(),gain=actx.createGain(),dist=actx.createWaveShaper();
         var cv=new Float32Array(256);
         for(var i=0;i<256;i++) cv[i]=(i<128?i/128:(i-256)/128)*0.5;
         dist.curve=cv;
-        osc.connect(dist); dist.connect(gain); gain.connect(actx.destination);
-        osc.type='sawtooth'; osc.frequency.value=n.f;
+        osc.connect(dist);dist.connect(gain);gain.connect(actx.destination);
+        osc.type='sawtooth';osc.frequency.value=n.f;
         var t=actx.currentTime+n.t+0.05;
         gain.gain.setValueAtTime(0,t);
         gain.gain.linearRampToValueAtTime(0.3,t+0.04);
         gain.gain.exponentialRampToValueAtTime(0.001,t+n.d+0.08);
-        osc.start(t); osc.stop(t+n.d+0.15);
+        osc.start(t);osc.stop(t+n.d+0.15);
       }});
     }});
-  }} catch(e){{ console.warn(e); }}
+  }} catch(e){{ console.warn('audio',e); }}
 
-  /* ── 粒子 ────────────────────────────────────────── */
-  var canvas=document.getElementById('vic_canvas_{_id}');
-  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
-  var W=canvas.width, H=canvas.height, cx=canvas.getContext('2d');
+  /* 粒子 */
   var COLORS=['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#fff','#ffeaa7','#6c5ce7'];
-
   function P(x,y,a){{
-    this.x=x; this.y=y;
+    this.x=x;this.y=y;
     this.color=COLORS[Math.floor(Math.random()*COLORS.length)];
     var spd=6+Math.random()*16;
-    this.vx=Math.cos(a)*spd; this.vy=Math.sin(a)*spd;
+    this.vx=Math.cos(a)*spd;this.vy=Math.sin(a)*spd;
     this.size=5+Math.random()*10;
     this.shape=Math.random()<0.5?'r':'c';
-    this.rot=Math.random()*Math.PI*2; this.rs=(Math.random()-.5)*.35;
-    this.life=1; this.decay=0.008+Math.random()*0.012;
+    this.rot=Math.random()*Math.PI*2;this.rs=(Math.random()-.5)*.35;
+    this.life=1;this.decay=0.008+Math.random()*0.012;
     this.g=0.18+Math.random()*.15;
   }}
   P.prototype.update=function(){{this.vy+=this.g;this.vx*=.99;this.x+=this.vx;this.y+=this.vy;this.rot+=this.rs;this.life-=this.decay;}};
   P.prototype.draw=function(){{
     cx.save();cx.globalAlpha=Math.max(0,this.life);cx.fillStyle=this.color;
     cx.translate(this.x,this.y);cx.rotate(this.rot);
-    if(this.shape==='r'){{cx.fillRect(-this.size/2,-this.size/4,this.size,this.size*.5);}}
-    else{{cx.beginPath();cx.arc(0,0,this.size/2,0,Math.PI*2);cx.fill();}}
+    if(this.shape==='r'){{ cx.fillRect(-this.size/2,-this.size/4,this.size,this.size*.5); }}
+    else{{ cx.beginPath();cx.arc(0,0,this.size/2,0,Math.PI*2);cx.fill(); }}
     cx.restore();
   }};
 
@@ -405,7 +415,7 @@ def inject_victory_effect():
 
   function spawn(b){{
     for(var i=0;i<b.n;i++){{
-      var ang = b.a!==null ? b.a+(Math.random()-.5)*Math.PI*.9 : Math.random()*Math.PI*2;
+      var ang=b.a!==null?b.a+(Math.random()-.5)*Math.PI*.9:Math.random()*Math.PI*2;
       particles.push(new P(b.x,b.y,ang));
     }}
   }}
@@ -416,14 +426,14 @@ def inject_victory_effect():
     particles.forEach(function(p){{p.update();p.draw();}});
     frame++;
     if(frame<650||particles.length>0) requestAnimationFrame(loop);
-    else cx.clearRect(0,0,W,H);
+    else{{ cx.clearRect(0,0,W,H); canvas.remove(); }}
   }}
   loop();
 }})();
 </script>
-""",
-        unsafe_allow_html=True,
-    )
+</body>
+</html>"""
+    components.html(html, height=1, scrolling=False)
 
 
 # ============================================================
