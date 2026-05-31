@@ -1285,11 +1285,11 @@ elif "Flash Pulse" in choice:
 
     if not due:
         msg = (
-            f"「{pulse_cat}」類別目前沒有待複習的單字。"
+            f"Matrix Stable. No nodes due for review in [{pulse_cat}]."
             if pulse_cat != "全部"
             else "Matrix Stable. No nodes due for review."
         )
-        st.success(msg)
+        st.success(msg + " 🎉 Good job — you're all caught up!")
         st.stop()
 
     def init_session():
