@@ -310,18 +310,42 @@ def inject_sound(sound_type: str):
 def inject_victory_effect():
     import streamlit.components.v1 as components
 
-    # 音效：勝利號角（鋸齒波六音上升），height=0 只跑 JS 音效
-    sound_html = """<!DOCTYPE html><html><body>
+    html_code = """<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+
+<!-- 閃光背景層 -->
+<div id="flash" style="
+    position:fixed;top:0;left:0;width:100vw;height:100vh;
+    pointer-events:none;z-index:8888;
+    background:radial-gradient(ellipse at center, rgba(0,206,201,0.35) 0%, rgba(9,132,227,0.2) 40%, transparent 70%);
+    opacity:0;
+    animation: flashIn 1.8s ease-out forwards;
+"></div>
+
+<!-- 粒子 canvas -->
+<canvas id="c" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;"></canvas>
+
+<style>
+@keyframes flashIn {
+    0%   { opacity: 0; }
+    8%   { opacity: 1; }
+    35%  { opacity: 0.6; }
+    100% { opacity: 0; }
+}
+</style>
+
 <script>
 (function(){
+  // ── 勝利號角音效 ──────────────────────────────────────────
   try {
     var AudioCtx = window.AudioContext || window.webkitAudioContext;
     var actx = new AudioCtx();
     var resume = actx.state === 'suspended' ? actx.resume() : Promise.resolve();
     resume.then(function(){
       var trumpet = [
-        {f:392,t:0.00,d:0.20},{f:523,t:0.20,d:0.20},{f:659,t:0.40,d:0.20},
-        {f:784,t:0.60,d:0.30},{f:784,t:0.90,d:0.15},{f:880,t:1.05,d:0.60}
+        {f:392,t:0.00,d:0.22},{f:523,t:0.22,d:0.22},{f:659,t:0.44,d:0.22},
+        {f:784,t:0.66,d:0.32},{f:784,t:0.98,d:0.16},{f:880,t:1.14,d:0.65}
       ];
       trumpet.forEach(function(n){
         var osc  = actx.createOscillator();
@@ -341,42 +365,34 @@ def inject_victory_effect():
       });
     });
   } catch(e){ console.warn('audio:', e); }
-})();
-</script>
-</body></html>"""
-    components.html(sound_html, height=0, scrolling=False)
 
-    # 粒子動畫：放在有高度的 iframe 裡，canvas 填滿 iframe
-    particle_html = """<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
-<canvas id="c" style="display:block;width:100%;height:100%;"></canvas>
-<script>
-(function(){
+  // ── 爆炸粒子（從四面八方噴射，鋪滿全螢幕）─────────────────
   var canvas = document.getElementById('c');
-  var W = canvas.width  = canvas.offsetWidth  || 800;
-  var H = canvas.height = canvas.offsetHeight || 300;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  var W = canvas.width, H = canvas.height;
   var cx = canvas.getContext('2d');
 
-  var COLORS = ['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#ffffff','#ffeaa7'];
+  var COLORS = ['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#ffffff','#ffeaa7','#6c5ce7'];
 
-  function Particle(x, y){
+  function Particle(x, y, angleOverride){
     this.x = x; this.y = y;
     this.color = COLORS[Math.floor(Math.random()*COLORS.length)];
-    var angle = Math.random() * Math.PI * 2;
-    var speed = 4 + Math.random() * 10;
+    var angle = (angleOverride !== undefined) ? angleOverride : Math.random() * Math.PI * 2;
+    var speed = 6 + Math.random() * 16;
     this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed - 6;
-    this.size = 5 + Math.random() * 8;
+    this.vy = Math.sin(angle) * speed;
+    this.size = 5 + Math.random() * 10;
     this.shape = Math.random() < 0.5 ? 'rect' : 'circle';
     this.rotation = Math.random() * Math.PI * 2;
-    this.rotSpeed = (Math.random()-0.5) * 0.3;
+    this.rotSpeed = (Math.random()-0.5) * 0.35;
     this.life = 1.0;
-    this.decay = 0.010 + Math.random() * 0.015;
+    this.decay = 0.008 + Math.random() * 0.012;
+    this.gravity = 0.18 + Math.random() * 0.15;
   }
   Particle.prototype.update = function(){
-    this.vy += 0.25;
-    this.vx *= 0.98;
+    this.vy += this.gravity;
+    this.vx *= 0.99;
     this.x += this.vx; this.y += this.vy;
     this.rotation += this.rotSpeed;
     this.life -= this.decay;
@@ -388,7 +404,7 @@ def inject_victory_effect():
     cx.translate(this.x, this.y);
     cx.rotate(this.rotation);
     if(this.shape === 'rect'){
-      cx.fillRect(-this.size/2, -this.size/4, this.size, this.size*0.45);
+      cx.fillRect(-this.size/2, -this.size/4, this.size, this.size*0.5);
     } else {
       cx.beginPath();
       cx.arc(0, 0, this.size/2, 0, Math.PI*2);
@@ -397,38 +413,54 @@ def inject_victory_effect():
     cx.restore();
   };
 
-  var bursts = [
-    {x: W*0.15, y: H*0.4,  delay: 0},
-    {x: W*0.50, y: H*0.2,  delay: 80},
-    {x: W*0.85, y: H*0.4,  delay: 160},
-    {x: W*0.30, y: H*0.7,  delay: 260},
-    {x: W*0.70, y: H*0.65, delay: 360},
-    {x: W*0.50, y: H*0.85, delay: 460},
-  ];
-
   var particles = [];
   var frame = 0;
 
-  function spawnBurst(bx, by){
-    for(var i=0;i<100;i++) particles.push(new Particle(bx, by));
+  // 爆炸點：中央 + 四個角落 + 四邊中點
+  var bursts = [
+    // 中央大爆炸
+    {x: W*0.50, y: H*0.40, count:180, delay:0,   fromEdge: false},
+    // 四角
+    {x: W*0.05, y: H*0.05, count:100, delay:60,  fromEdge: true, edgeAngle: Math.PI*0.25},
+    {x: W*0.95, y: H*0.05, count:100, delay:80,  fromEdge: true, edgeAngle: Math.PI*0.75},
+    {x: W*0.05, y: H*0.95, count:100, delay:100, fromEdge: true, edgeAngle: -Math.PI*0.25},
+    {x: W*0.95, y: H*0.95, count:100, delay:120, fromEdge: true, edgeAngle: -Math.PI*0.75},
+    // 四邊中點
+    {x: W*0.50, y: H*0.02, count:80,  delay:160, fromEdge: true, edgeAngle: Math.PI*0.5},
+    {x: W*0.50, y: H*0.98, count:80,  delay:180, fromEdge: true, edgeAngle: -Math.PI*0.5},
+    {x: W*0.02, y: H*0.50, count:80,  delay:200, fromEdge: true, edgeAngle: 0},
+    {x: W*0.98, y: H*0.50, count:80,  delay:220, fromEdge: true, edgeAngle: Math.PI},
+  ];
+
+  function spawnBurst(b){
+    for(var i=0; i<b.count; i++){
+      var angle;
+      if(b.fromEdge){
+        // 從邊緣往內扇形噴射
+        angle = b.edgeAngle + (Math.random()-0.5) * Math.PI * 0.9;
+      } else {
+        angle = Math.random() * Math.PI * 2;
+      }
+      particles.push(new Particle(b.x, b.y, angle));
+    }
   }
 
   function loop(){
     cx.clearRect(0, 0, W, H);
     bursts.forEach(function(b){
-      if(frame === b.delay) spawnBurst(b.x, b.y);
+      if(frame === b.delay) spawnBurst(b);
     });
     particles = particles.filter(function(p){ return p.life > 0; });
     particles.forEach(function(p){ p.update(); p.draw(); });
     frame++;
-    if(frame < 550 || particles.length > 0) requestAnimationFrame(loop);
+    if(frame < 600 || particles.length > 0) requestAnimationFrame(loop);
     else cx.clearRect(0,0,W,H);
   }
   loop();
 })();
 </script>
 </body></html>"""
-    components.html(particle_html, height=300, scrolling=False)
+    components.html(html_code, height=0, scrolling=False)
 
 
 # ============================================================
@@ -1523,12 +1555,15 @@ elif "Flash Pulse" in choice:
     # ══════════════════════════════════════════════════════════
     # 測驗結束畫面  ← Flash Pulse 專用勝利特效
     # ══════════════════════════════════════════════════════════
+    # idx 超出時直接設 done，不 rerun，同一次渲染直接顯示結束畫面
+    if st.session_state.pulse_session_idx >= len(session_words):
+        st.session_state.pulse_session_done = True
+
     if st.session_state.get("pulse_session_done", False):
         wrong_list = st.session_state.get("pulse_wrong_words", [])
         total = len(session_words)
         correct_count = total - len(wrong_list)
 
-        # 🎺 勝利號角 + 💥 爆炸粒子（取代原本的 inject_sound("completion") + st.balloons()）
         inject_victory_effect()
 
         st.markdown(
@@ -1706,6 +1741,7 @@ elif "Flash Pulse" in choice:
             st.session_state.pulse_session_idx += 1
             st.session_state.hint_level = 0
             if st.session_state.pulse_session_idx >= total:
+                # 最後一題答對：不 rerun，讓同一次渲染直接進結束畫面（特效才不會被沖掉）
                 st.session_state.pulse_session_done = True
                 st.rerun()
             else:
