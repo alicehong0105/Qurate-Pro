@@ -1587,6 +1587,28 @@ elif "Flash Pulse" in choice:
         st.stop()
 
     # ══════════════════════════════════════════════════════════
+    # 最後一題答對後的停留畫面（在結束畫面前攔截）
+    # ══════════════════════════════════════════════════════════
+    if st.session_state.get("pulse_last_correct", False):
+        inject_sound("success")
+        st.markdown(
+            """
+<div style="text-align:center;padding:3rem 0;">
+  <div style="font-size:6rem">🎉</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:800;color:#55efc4;margin:0.5rem 0">
+    Correct!
+  </div>
+  <div style="color:#8b949e;font-size:1.1rem;margin-bottom:2rem">最後一個單字答對了！</div>
+</div>""",
+            unsafe_allow_html=True,
+        )
+        if st.button("🏁 查看測驗結果", use_container_width=True):
+            st.session_state.pulse_last_correct = False
+            st.session_state.pulse_session_done = True
+            st.rerun()
+        st.stop()
+
+    # ══════════════════════════════════════════════════════════
     # 測驗結束畫面  ← Flash Pulse 專用勝利特效
     # ══════════════════════════════════════════════════════════
     # idx 超出時直接設 done，不 rerun，同一次渲染直接顯示結束畫面
@@ -1704,26 +1726,6 @@ elif "Flash Pulse" in choice:
     # ══════════════════════════════════════════════════════════
     # 正在作答
     # ══════════════════════════════════════════════════════════
-
-    # 最後一題答對後的停留畫面
-    if st.session_state.get("pulse_last_correct", False):
-        inject_sound("success")
-        st.markdown(
-            """
-<div style="text-align:center;padding:2rem 0;">
-  <div style="font-size:5rem">🎉</div>
-  <div style="font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:800;color:#55efc4;margin:0.5rem 0">
-    Correct!
-  </div>
-  <div style="color:#8b949e;font-size:1rem">最後一個單字答對了！</div>
-</div>""",
-            unsafe_allow_html=True,
-        )
-        if st.button("🏁 查看測驗結果", use_container_width=True):
-            st.session_state.pulse_last_correct = False
-            st.session_state.pulse_session_done = True
-            st.rerun()
-        st.stop()
 
     idx = st.session_state.pulse_session_idx
     if idx >= len(session_words):
