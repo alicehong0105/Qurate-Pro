@@ -1591,9 +1591,8 @@ elif "Flash Pulse" in choice:
     # idx 超出保護：只有在兩個停留畫面都不存在時才設定 done
     # ══════════════════════════════════════════════════════════
     if st.session_state.pulse_session_idx >= len(session_words):
-        if not st.session_state.get(
-            "pulse_last_correct", False
-        ) and not st.session_state.get("pulse_last_wrong"):
+        if not st.session_state.get("pulse_last_correct", False) \
+           and not st.session_state.get("pulse_last_wrong"):
             st.session_state.pulse_session_done = True
 
     # ══════════════════════════════════════════════════════════
@@ -1606,9 +1605,9 @@ elif "Flash Pulse" in choice:
 <div style="text-align:center;padding:3rem 0;">
   <div style="font-size:6rem">💀</div>
   <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:800;color:#ff7675;margin:0.5rem 0">
-    答案是：{info["word"]}
+    答案是：{info['word']}
   </div>
-  <div style="color:#8b949e;font-size:1.1rem;margin-bottom:2rem">熟練度 L{info["old_m"]} → L{info["new_m"]}</div>
+  <div style="color:#8b949e;font-size:1.1rem;margin-bottom:2rem">熟練度 L{info['old_m']} → L{info['new_m']}</div>
 </div>""",
             unsafe_allow_html=True,
         )
@@ -1859,9 +1858,7 @@ elif "Flash Pulse" in choice:
                         "new_m": new_m,
                     }
                 else:
-                    st.error(
-                        f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
-                    )
+                    st.error(f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}")
                 st.rerun()
 
     if play_btn:
