@@ -239,33 +239,63 @@ def play_pronunciation(word: str):
             audio_bytes = f.read()
         audio_b64 = base64.b64encode(audio_bytes).decode()
 
-        # 用 Web Audio API 播放，不搶佔系統媒體路由，不打斷背景音樂
         components.html(
-            f"""<!DOCTYPE html><html><body>
+            f"""<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body {{ margin:0; padding:0; background:transparent; }}
+  button {{
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, #00cec9, #0984e3);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+  }}
+  button:active {{ opacity: 0.8; }}
+</style>
+</head>
+<body>
+<button onclick="playAudio()">🔊 播放發音</button>
 <script>
-(function(){{
-  var b64 = "{audio_b64}";
-  var binary = atob(b64);
-  var bytes = new Uint8Array(binary.length);
-  for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  var AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  // 'ambient' 讓 iOS 知道這是「音效」而非「媒體」，不打斷背景音樂
-  var ctx = new AC({{ latencyHint: 'interactive' }});
-  // iOS Safari 需要在 user gesture 後 resume
+var audioCtx = null;
+
+function playAudio() {{
+  var dataUrl = "data:audio/mp3;base64,{audio_b64}";
+
+  // AudioContext 在使用者點擊的同步 call stack 內建立，iOS 才允許
+  if (!audioCtx) {{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }}
+
+  var ctx = audioCtx;
   var go = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+
   go.then(function() {{
-    ctx.decodeAudioData(bytes.buffer, function(decoded) {{
-      var src = ctx.createBufferSource();
-      src.buffer = decoded;
-      src.connect(ctx.destination);
-      src.start(0);
-    }}, function(e) {{ console.warn('decode error', e); }});
+    return fetch(dataUrl);
+  }}).then(function(r) {{
+    return r.arrayBuffer();
+  }}).then(function(buf) {{
+    return ctx.decodeAudioData(buf);
+  }}).then(function(decoded) {{
+    var src = ctx.createBufferSource();
+    src.buffer = decoded;
+    src.connect(ctx.destination);
+    src.start(0);
+  }}).catch(function(e) {{
+    console.warn('audio error', e);
   }});
-}})();
+}}
 </script>
-</body></html>""",
-            height=0,
+</body>
+</html>""",
+            height=60,
             scrolling=False,
         )
 
