@@ -269,7 +269,6 @@ var audioCtx = null;
 function playAudio() {{
   var dataUrl = "data:audio/mp3;base64,{audio_b64}";
 
-  // AudioContext 在使用者點擊的同步 call stack 內建立，iOS 才允許
   if (!audioCtx) {{
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }}
@@ -363,7 +362,6 @@ def inject_sound(sound_type: str):
 # Flash Pulse 專用：勝利號角 + 爆炸粒子特效
 # ============================================================
 def inject_congrats_sound():
-    """播放 Congratulations 音效：上升琶音 + 長尾餘韻"""
     import streamlit.components.v1 as components
 
     html = """<!DOCTYPE html><html><body>
@@ -374,7 +372,6 @@ def inject_congrats_sound():
     var ctx = new AC();
     var go = ctx.state==='suspended' ? ctx.resume() : Promise.resolve();
     go.then(function(){
-      // 主旋律：歡樂上升琶音
       var melody = [
         {f:523.25, t:0.00, d:0.18, vol:0.35},
         {f:659.25, t:0.16, d:0.18, vol:0.35},
@@ -383,7 +380,6 @@ def inject_congrats_sound():
         {f:987.77, t:0.70, d:0.18, vol:0.30},
         {f:1046.5, t:0.88, d:0.55, vol:0.45},
       ];
-      // 和聲層
       var harmony = [
         {f:261.63, t:0.00, d:0.55, vol:0.15},
         {f:329.63, t:0.00, d:0.55, vol:0.12},
@@ -427,10 +423,8 @@ def inject_victory_effect():
 <body>
 <script>
 (function(){{
-  /* 在父頁面建立 canvas 和閃光層 */
   var doc = window.parent.document;
 
-  /* 閃光背景 */
   var flash = doc.createElement('div');
   flash.id = 'vic_flash_{_id}';
   flash.style.cssText = [
@@ -445,7 +439,6 @@ def inject_victory_effect():
   setTimeout(function(){{ flash.style.opacity='0'; }}, 1800);
   setTimeout(function(){{ flash.remove(); }}, 2200);
 
-  /* Canvas */
   var canvas = doc.createElement('canvas');
   canvas.id = 'vic_canvas_{_id}';
   canvas.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;';
@@ -455,7 +448,6 @@ def inject_victory_effect():
   var W = canvas.width, H = canvas.height;
   var cx = canvas.getContext('2d');
 
-  /* 音效：勝利號角 */
   try {{
     var AC = window.parent.AudioContext || window.parent.webkitAudioContext
           || window.AudioContext || window.webkitAudioContext;
@@ -482,7 +474,6 @@ def inject_victory_effect():
     }});
   }} catch(e){{ console.warn('audio',e); }}
 
-  /* 粒子 */
   var COLORS=['#00cec9','#0984e3','#55efc4','#fdcb6e','#ff7675','#a29bfe','#fd79a8','#fff','#ffeaa7','#6c5ce7'];
   function P(x,y,a){{
     this.x=x;this.y=y;
@@ -538,7 +529,6 @@ def inject_victory_effect():
   }}
   loop();
 
-  /* 8秒後強制清除，避免殘留 */
   setTimeout(function(){{
     try{{ canvas.remove(); }} catch(e){{}}
     try{{ doc.getElementById('vic_flash_{_id}').remove(); }} catch(e){{}}
@@ -884,10 +874,9 @@ if "Matrix Core" in choice:
                     f"<span class='cat-badge'>📂 {current_cat}</span>",
                     unsafe_allow_html=True,
                 )
-                col_pron, _ = st.columns([1, 2])
-                with col_pron:
-                    if st.button(f"🔊 播放發音：{target_word}"):
-                        play_pronunciation(target_word)
+                # ── 唯一一顆發音按鈕（表單外）──
+                if st.button(f"🔊 播放發音：{target_word}", key="edit_pron_btn"):
+                    play_pronunciation(target_word)
                 with st.form("edit_matrix_form"):
                     e1, e2 = st.columns(2)
                     u_word = e1.text_input("Entry（單字）*", value=row["word"])
@@ -1161,7 +1150,9 @@ elif "Matrix Cards" in choice:
             if (w.get("category") or "預設") == st.session_state.card_cat
         ]
 
+    # ── render_fields：每張卡只出現一顆發音按鈕 ──
     def render_fields(card, field_labels, is_front=False):
+        _pron_rendered = False
         for label in field_labels:
             field_key = FIELD_OPTIONS.get(label)
             if not field_key:
@@ -1176,10 +1167,12 @@ elif "Matrix Cards" in choice:
                     f"<h1 style='text-align:center;font-size:3.5rem;margin:0.5rem 0'>{card['word']}</h1>",
                     unsafe_allow_html=True,
                 )
-                if st.button(
-                    "🔊 播放發音", key=f"pron_{card.get('id', 'x')}_{is_front}"
-                ):
-                    play_pronunciation(card["word"])
+                if not _pron_rendered:
+                    if st.button(
+                        "🔊 播放發音", key=f"pron_{card.get('id', 'x')}_{is_front}"
+                    ):
+                        play_pronunciation(card["word"])
+                    _pron_rendered = True
             elif field_key == "meaning_zh":
                 val = card.get("meaning_zh", "")
                 if val:
@@ -1223,7 +1216,6 @@ elif "Matrix Cards" in choice:
         if st.session_state.card_index >= len(due_cards):
             st.session_state.card_index = len(due_cards) - 1
 
-        # Matrix Cards 完成：保留原本氣球 + triangle 音效
         if st.session_state.get("card_show_completion", False):
             inject_sound("completion")
             st.balloons()
@@ -1364,7 +1356,7 @@ elif "Flash Pulse" in choice:
         st.session_state.prompt_expanded = {}
         st.session_state.pulse_victory_shown = False
         st.session_state.pulse_last_correct = False
-        st.session_state.pulse_last_wrong = None  # ← 新增
+        st.session_state.pulse_last_wrong = None
 
     if "pulse_session_words" not in st.session_state:
         init_session()
@@ -1615,6 +1607,7 @@ elif "Flash Pulse" in choice:
                     st.markdown(f"**📝 例句：** {rc['example']}")
                 if rc.get("collocations"):
                     st.markdown(f"**🎯 慣用搭配：** {rc['collocations']}")
+                # ── 唯一一顆發音按鈕（翻到反面才顯示）──
                 if st.button("🔊 播放發音", key=f"rev_pron_{rc.get('id', 'x')}"):
                     play_pronunciation(rc["word"])
 
@@ -1643,7 +1636,7 @@ elif "Flash Pulse" in choice:
         st.stop()
 
     # ══════════════════════════════════════════════════════════
-    # idx 超出保護：只有在兩個停留畫面都不存在時才設定 done
+    # idx 超出保護
     # ══════════════════════════════════════════════════════════
     if st.session_state.pulse_session_idx >= len(session_words):
         if not st.session_state.get(
@@ -1696,7 +1689,7 @@ elif "Flash Pulse" in choice:
         st.stop()
 
     # ══════════════════════════════════════════════════════════
-    # 測驗結束畫面  ← Flash Pulse 專用勝利特效
+    # 測驗結束畫面
     # ══════════════════════════════════════════════════════════
     if st.session_state.get("pulse_session_done", False):
         wrong_list = st.session_state.get("pulse_wrong_words", [])
@@ -1835,7 +1828,6 @@ elif "Flash Pulse" in choice:
             st.session_state.pulse_session_idx += 1
             st.session_state.hint_level = 0
             if st.session_state.pulse_session_idx >= total:
-                # 最後一題放棄：顯示停留畫面
                 st.session_state.pulse_last_wrong = {
                     "word": q["word"],
                     "old_m": current_m,
@@ -1867,19 +1859,20 @@ elif "Flash Pulse" in choice:
             f"目前熟練度：{'⭐' * int(q.get('mastery', 1))} L{q.get('mastery', 1)}"
         )
 
+    # ── 作答表單（移除發音 submit button）──
     with st.form("pulse_form_session", clear_on_submit=True):
         ans = st.text_input(
             "Type the correct Entry（不分大小寫）:",
             key="pulse_input_s",
             placeholder="輸入答案後按 Enter 送出",
         )
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            submitted = st.form_submit_button(
-                "EXECUTE VERIFICATION", use_container_width=True
-            )
-        with col2:
-            play_btn = st.form_submit_button("🔊 發音", use_container_width=True)
+        submitted = st.form_submit_button(
+            "EXECUTE VERIFICATION", use_container_width=True
+        )
+
+    # ── 唯一一顆發音按鈕（表單外）──
+    if st.button("🔊 播放發音", key=f"pulse_pron_{q.get('id', 'x')}"):
+        play_pronunciation(q["word"])
 
     if submitted and ans.strip():
         if ans.strip().lower() == q["word"].lower():
@@ -1889,7 +1882,6 @@ elif "Flash Pulse" in choice:
             st.session_state.pulse_session_idx += 1
             st.session_state.hint_level = 0
             if st.session_state.pulse_session_idx >= total:
-                # 最後一題答對：顯示停留畫面，等使用者按按鈕才跳到結束
                 st.session_state.pulse_last_correct = True
             st.rerun()
         else:
@@ -1907,7 +1899,6 @@ elif "Flash Pulse" in choice:
                 st.session_state.pulse_session_idx += 1
                 st.session_state.hint_level = 0
                 if st.session_state.pulse_session_idx >= total:
-                    # 最後一題答錯：顯示停留畫面
                     st.session_state.pulse_last_wrong = {
                         "word": q["word"],
                         "old_m": current_m,
@@ -1918,9 +1909,6 @@ elif "Flash Pulse" in choice:
                         f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
                     )
                 st.rerun()
-
-    if play_btn:
-        play_pronunciation(q["word"])
 
     st.markdown("---")
     hint_status = {
