@@ -231,19 +231,44 @@ def get_all_categories(raw_data):
 def play_pronunciation(word: str):
     try:
         from gtts import gTTS
+        import streamlit.components.v1 as components
 
         tts = gTTS(text=word, lang="en", tld="co.uk")
         tts.save("/tmp/pronunciation.mp3")
         with open("/tmp/pronunciation.mp3", "rb") as f:
             audio_bytes = f.read()
         audio_b64 = base64.b64encode(audio_bytes).decode()
-        st.markdown(
-            f"""
-            <audio autoplay controls style="width:100%; margin-top:0.5rem;">
-                <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
-            </audio>""",
-            unsafe_allow_html=True,
+
+        # 用 Web Audio API 播放，不搶佔系統媒體路由，不打斷背景音樂
+        components.html(
+            f"""<!DOCTYPE html><html><body>
+<script>
+(function(){{
+  var b64 = "{audio_b64}";
+  var binary = atob(b64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  // 'ambient' 讓 iOS 知道這是「音效」而非「媒體」，不打斷背景音樂
+  var ctx = new AC({{ latencyHint: 'interactive' }});
+  // iOS Safari 需要在 user gesture 後 resume
+  var go = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+  go.then(function() {{
+    ctx.decodeAudioData(bytes.buffer, function(decoded) {{
+      var src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start(0);
+    }}, function(e) {{ console.warn('decode error', e); }});
+  }});
+}})();
+</script>
+</body></html>""",
+            height=0,
+            scrolling=False,
         )
+
     except Exception:
         st.link_button(
             f"🔊 Cambridge: {word}",
@@ -1591,8 +1616,9 @@ elif "Flash Pulse" in choice:
     # idx 超出保護：只有在兩個停留畫面都不存在時才設定 done
     # ══════════════════════════════════════════════════════════
     if st.session_state.pulse_session_idx >= len(session_words):
-        if not st.session_state.get("pulse_last_correct", False) \
-           and not st.session_state.get("pulse_last_wrong"):
+        if not st.session_state.get(
+            "pulse_last_correct", False
+        ) and not st.session_state.get("pulse_last_wrong"):
             st.session_state.pulse_session_done = True
 
     # ══════════════════════════════════════════════════════════
@@ -1605,9 +1631,9 @@ elif "Flash Pulse" in choice:
 <div style="text-align:center;padding:3rem 0;">
   <div style="font-size:6rem">💀</div>
   <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:800;color:#ff7675;margin:0.5rem 0">
-    答案是：{info['word']}
+    答案是：{info["word"]}
   </div>
-  <div style="color:#8b949e;font-size:1.1rem;margin-bottom:2rem">熟練度 L{info['old_m']} → L{info['new_m']}</div>
+  <div style="color:#8b949e;font-size:1.1rem;margin-bottom:2rem">熟練度 L{info["old_m"]} → L{info["new_m"]}</div>
 </div>""",
             unsafe_allow_html=True,
         )
@@ -1858,7 +1884,9 @@ elif "Flash Pulse" in choice:
                         "new_m": new_m,
                     }
                 else:
-                    st.error(f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}")
+                    st.error(
+                        f"💀 答案是：**{q['word']}**　熟練度 L{current_m} → L{new_m}"
+                    )
                 st.rerun()
 
     if play_btn:
